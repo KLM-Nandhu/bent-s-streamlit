@@ -1,5 +1,5 @@
 streamlit
-youtube_transcript_api
+beautifulsoup4
 openai
 google-api-python-client
 requests
