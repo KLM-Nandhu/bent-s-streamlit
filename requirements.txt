@@ -1,5 +1,5 @@
-streamlit
-youtube_transcript_api
-openai
-google-api-python-client
-requests
+streamlit==1.23.1
+youtube_transcript_api==0.6.1
+openai==0.27.8
+google-api-python-client==2.88.0
+requests==2.31.0
