@@ -1,12 +1,11 @@
 import streamlit as st
-from youtube_transcript_api import YouTubeTranscriptApi
 import openai
 from typing import List, Dict
 import asyncio
 import requests
-from io import BytesIO
+from bs4 import BeautifulSoup
 from datetime import datetime
-import base64
+import json
 from googleapiclient.discovery import build
 import re
 
@@ -69,7 +68,45 @@ def get_all_comments(video_id: str) -> List[Dict]:
 
 def get_video_transcript_with_timestamps(video_id: str) -> List[Dict]:
     try:
-        transcript = YouTubeTranscriptApi.get_transcript(video_id)
+        url = f"https://www.youtube.com/watch?v={video_id}"
+        response = requests.get(url)
+        soup = BeautifulSoup(response.text, 'html.parser')
+        
+        # Find the script tag containing the transcript data
+        script_tag = soup.find("script", string=re.compile("captionTracks"))
+        
+        if not script_tag:
+            return "Transcript not available for this video."
+        
+        # Extract and parse the JSON data
+        json_data = re.search(r"ytInitialPlayerResponse\s*=\s*({.*?});", script_tag.string).group(1)
+        data = json.loads(json_data)
+        
+        # Extract the transcript URL
+        transcript_url = None
+        for caption_track in data['captions']['playerCaptionsTracklistRenderer']['captionTracks']:
+            if caption_track['languageCode'] == 'en':
+                transcript_url = caption_track['baseUrl']
+                break
+        
+        if not transcript_url:
+            return "English transcript not available for this video."
+        
+        # Fetch and parse the transcript
+        transcript_response = requests.get(transcript_url)
+        transcript_soup = BeautifulSoup(transcript_response.text, 'html.parser')
+        
+        transcript = []
+        for text in transcript_soup.find_all('text'):
+            start = float(text['start'])
+            duration = float(text['dur'])
+            content = text.string
+            transcript.append({
+                'start': start,
+                'duration': duration,
+                'text': content
+            })
+        
         return transcript
     except Exception as e:
         return f"An error occurred while fetching the transcript: {str(e)}"
