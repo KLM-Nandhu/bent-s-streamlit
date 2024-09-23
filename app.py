@@ -9,8 +9,6 @@ from datetime import datetime
 import base64
 from googleapiclient.discovery import build
 import re
-import json
-import sys
 
 # Set your API keys here
 openai.api_key = st.secrets["OPENAI_API_KEY"]
@@ -71,46 +69,10 @@ def get_all_comments(video_id: str) -> List[Dict]:
 
 def get_video_transcript_with_timestamps(video_id: str) -> List[Dict]:
     try:
-        # First, try using YouTubeTranscriptApi
         transcript = YouTubeTranscriptApi.get_transcript(video_id)
         return transcript
     except Exception as e:
-        # If YouTubeTranscriptApi fails, try alternative method
-        try:
-            response = requests.get(f'https://www.youtube.com/watch?v={video_id}')
-            response.raise_for_status()
-            html = response.text
-
-            # Extract the serialized transcript data
-            pattern = r'ytInitialPlayerResponse\s*=\s*({.*?});'
-            match = re.search(pattern, html)
-            if not match:
-                return f"Error: Could not find transcript data in the video page."
-
-            data = json.loads(match.group(1))
-            transcript_data = data['captions']['playerCaptionsTracklistRenderer']['captionTracks'][0]['baseUrl']
-
-            # Fetch the actual transcript
-            transcript_response = requests.get(transcript_data)
-            transcript_response.raise_for_status()
-            transcript_xml = transcript_response.text
-
-            # Parse the XML to extract text and timestamps
-            pattern = r'<text start="([\d.]+)" dur="([\d.]+)".*?>(.*?)</text>'
-            matches = re.findall(pattern, transcript_xml)
-
-            transcript = [
-                {
-                    'text': re.sub(r'&#39;', "'", text),
-                    'start': float(start),
-                    'duration': float(duration)
-                }
-                for start, duration, text in matches
-            ]
-
-            return transcript
-        except Exception as e:
-            return f"An error occurred while fetching the transcript: {str(e)}"
+        return f"An error occurred while fetching the transcript: {str(e)}"
 
 def format_time(seconds: float) -> str:
     hours, remainder = divmod(int(seconds), 3600)
@@ -138,7 +100,7 @@ Please format the response as follows:
 
     try:
         response = await openai.ChatCompletion.acreate(
-            model="gpt-4",
+            model="gpt-4o-mini",
             messages=[
                 {"role": "system", "content": "You are a helpful assistant that organizes video transcripts without altering their content."},
                 {"role": "user", "content": prompt}
@@ -184,7 +146,7 @@ Please format the blog post accordingly, ensuring all relevant information from 
 
     try:
         response = await openai.ChatCompletion.acreate(
-            model="gpt-4",
+            model="gpt-4o-mini",
             messages=[
                 {"role": "system", "content": "You are a helpful assistant that creates detailed blog posts from video transcripts and information."},
                 {"role": "user", "content": prompt}
@@ -365,54 +327,43 @@ st.title("BENT-S-BLOG")
 
 video_id = st.text_input("Enter YouTube Video ID")
 
-if st.checkbox("Show debug information"):
-    st.write("Debug Information:")
-    st.write(f"Streamlit version: {st.__version__}")
-    st.write(f"youtube_transcript_api version: {YouTubeTranscriptApi.__version__}")
-    st.write(f"openai version: {openai.__version__}")
-    st.write(f"googleapiclient version: {googleapiclient.__version__}")
-    st.write(f"Python version: {sys.version}")
-
 if st.button("Process Transcript and Generate Blog Post"):
     if video_id:
         with st.spinner("Processing transcript and generating blog post..."):
             video_info = get_video_info(video_id)
             if isinstance(video_info, dict):
                 transcript = get_video_transcript_with_timestamps(video_id)
-                if isinstance(transcript, list):
-                    comments = get_all_comments(video_id)
-                    if isinstance(comments, list):
-                        processed_transcript = asyncio.run(process_full_transcript(transcript, video_id))
-                        blog_post = asyncio.run(generate_blog_post(processed_transcript, video_info))
-                        formatted_blog_post = format_blog_post(blog_post, video_info)
-                        
-                        # Display the blog post content
-                        st.markdown("<div class='blog-post'>", unsafe_allow_html=True)
-                        st.markdown("<div class='blog-content'>", unsafe_allow_html=True)
-                        st.markdown(formatted_blog_post, unsafe_allow_html=True)
-                        st.markdown("</div>", unsafe_allow_html=True)
-                        st.markdown("</div>", unsafe_allow_html=True)
-                        
-                        # Display comments
-                        st.markdown("<div class='comments-container'>", unsafe_allow_html=True)
-                        st.markdown("<h2>Comments</h2>", unsafe_allow_html=True)
-                        st.markdown("<div class='comments-scrollable'>", unsafe_allow_html=True)
-                        for comment in comments:
-                            st.markdown(f"""
-                            <div class="comment">
-                                <div class="comment-author">{comment['author']}</div>
-                                <div class="comment-date">{comment['published_at']}</div>
-                                <div class="comment-text">{comment['text']}</div>
-                                <div class="comment-likes">👍 {comment['likes']}</div>
-                            </div>
-                            """, unsafe_allow_html=True)
-                        st.markdown("</div>", unsafe_allow_html=True)
-                        st.markdown("</div>", unsafe_allow_html=True)
-                    else:
-                        st.error(f"Error fetching comments: {comments}")
+                comments = get_all_comments(video_id)
+                if isinstance(transcript, list) and isinstance(comments, list):
+                    processed_transcript = asyncio.run(process_full_transcript(transcript, video_id))
+                    blog_post = asyncio.run(generate_blog_post(processed_transcript, video_info))
+                    formatted_blog_post = format_blog_post(blog_post, video_info)
+                    
+                    # Display the blog post content
+                    st.markdown("<div class='blog-post'>", unsafe_allow_html=True)
+                    st.markdown("<div class='blog-content'>", unsafe_allow_html=True)
+                    st.markdown(formatted_blog_post, unsafe_allow_html=True)
+                    st.markdown("</div>", unsafe_allow_html=True)
+                    st.markdown("</div>", unsafe_allow_html=True)
+                    
+                    # Display comments in a separate container with internal scrolling
+                    st.markdown("<div class='comments-container'>", unsafe_allow_html=True)
+                    st.markdown("<h2>Comments</h2>", unsafe_allow_html=True)
+                    st.markdown("<div class='comments-scrollable'>", unsafe_allow_html=True)
+                    for comment in comments:
+                        st.markdown(f"""
+<div class="comment">
+    <div class="comment-author">{comment['author']}</div>
+    <div class="comment-date">{comment['published_at']}</div>
+    <div class="comment-text">{comment['text']}</div>
+    <div class="comment-likes">👍 {comment['likes']}</div>
+</div>
+""", unsafe_allow_html=True)
+                    st.markdown("</div>", unsafe_allow_html=True)
+                    st.markdown("</div>", unsafe_allow_html=True)
                 else:
-                    st.error(f"Error fetching transcript: {transcript}")
+                    st.error(transcript if isinstance(transcript, str) else comments)
             else:
-                st.error(f"Error fetching video info: {video_info}")
+                st.error(video_info)
     else:
-        st.error("Please enter a YouTube Video ID.")
+         st.error("Please enter a YouTube Video ID.")
