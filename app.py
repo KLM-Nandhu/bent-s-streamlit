@@ -54,7 +54,7 @@ st.markdown("""
         font-weight: bold;
         border-radius: 8px;
         padding: 0.5rem 1rem;
-        position: relative;
+        position: center;
         width: 50%;
     }
     .stButton>button:hover {
