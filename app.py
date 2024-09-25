@@ -1,13 +1,14 @@
 import streamlit as st
+from youtube_transcript_api import YouTubeTranscriptApi
 import openai
 from typing import List, Dict
+import asyncio
 import requests
+from io import BytesIO
 from datetime import datetime
 import base64
 from googleapiclient.discovery import build
 import re
-import json
-import html
 
 # Set your API keys here
 openai.api_key = st.secrets["OPENAI_API_KEY"]
@@ -68,60 +69,17 @@ def get_all_comments(video_id: str) -> List[Dict]:
 
 def get_video_transcript_with_timestamps(video_id: str) -> List[Dict]:
     try:
-        # Fetch the video page
-        response = requests.get(f"https://www.youtube.com/watch?v={video_id}")
-        response.raise_for_status()  # Raise an exception for bad status codes
-        html_content = response.text
-
-        # Extract the ytInitialPlayerResponse
-        match = re.search(r"ytInitialPlayerResponse\s*=\s*({.+?});", html_content)
-        if not match:
-            return "Couldn't find transcript data in the video page."
-
-        player_response = json.loads(match.group(1))
-
-        # Extract caption tracks
-        caption_tracks = player_response.get('captions', {}).get('playerCaptionsTracklistRenderer', {}).get('captionTracks', [])
-        if not caption_tracks:
-            return "No captions available for this video."
-
-        # Get the first available English track, or the first track if no English is available
-        caption_track = next((track for track in caption_tracks if track.get('languageCode') == 'en'), caption_tracks[0])
-        
-        # Fetch the actual transcript data
-        transcript_url = caption_track['baseUrl']
-        transcript_response = requests.get(transcript_url)
-        transcript_response.raise_for_status()
-        transcript_xml = transcript_response.text
-
-        # Parse the XML to extract text and timestamps
-        transcript = []
-        for entry in re.finditer(r'<text start="([\d.]+)" dur="([\d.]+)".*?>(.*?)</text>', transcript_xml, re.DOTALL):
-            start = float(entry.group(1))
-            duration = float(entry.group(2))
-            text = re.sub(r'&#39;', "'", entry.group(3))  # Replace &#39; with '
-            text = re.sub(r'&quot;', '"', text)  # Replace &quot; with "
-            text = re.sub(r'&amp;', '&', text)  # Replace &amp; with &
-            transcript.append({
-                'start': start,
-                'duration': duration,
-                'text': text
-            })
-
+        transcript = YouTubeTranscriptApi.get_transcript(video_id)
         return transcript
-    except requests.RequestException as e:
-        return f"An error occurred while fetching the transcript: {str(e)}"
-    except json.JSONDecodeError as e:
-        return f"An error occurred while parsing the video data: {str(e)}"
     except Exception as e:
-        return f"An unexpected error occurred: {str(e)}"
+        return f"An error occurred while fetching the transcript: {str(e)}"
 
 def format_time(seconds: float) -> str:
     hours, remainder = divmod(int(seconds), 3600)
     minutes, seconds = divmod(remainder, 60)
     return f"{hours:02d}:{minutes:02d}:{seconds:02d}"
 
-def process_transcript_chunk(chunk: str, video_id: str) -> str:
+async def process_transcript_chunk(chunk: str, video_id: str) -> str:
     prompt = f"""This is a portion of a video transcript. Please organize this content into the following structure:
 
 For each distinct topic or section, include:
@@ -141,31 +99,31 @@ Please format the response as follows:
 """
 
     try:
-        response = openai.ChatCompletion.create(
-            model="gpt-4",
+        response = await openai.ChatCompletion.acreate(
+            model="gpt-4o-mini",
             messages=[
                 {"role": "system", "content": "You are a helpful assistant that organizes video transcripts without altering their content."},
                 {"role": "user", "content": prompt}
             ],
             max_tokens=2000
         )
-        return response.choices[0].message['content']
+        return response.choices[0].message.content
     except Exception as e:
         return f"An error occurred while processing with GPT-4: {str(e)}"
 
-def process_full_transcript(transcript: List[Dict], video_id: str) -> str:
+async def process_full_transcript(transcript: List[Dict], video_id: str) -> str:
     chunk_size = 10000  # Adjust this value based on your needs
     full_transcript = " ".join([f"{format_time(entry['start'])}: {entry['text']}" for entry in transcript])
     chunks = [full_transcript[i:i+chunk_size] for i in range(0, len(full_transcript), chunk_size)]
     
     processed_chunks = []
     for chunk in chunks:
-        processed_chunk = process_transcript_chunk(chunk, video_id)
+        processed_chunk = await process_transcript_chunk(chunk, video_id)
         processed_chunks.append(processed_chunk)
     
     return "\n\n".join(processed_chunks)
 
-def generate_blog_post(processed_transcript: str, video_info: Dict) -> str:
+async def generate_blog_post(processed_transcript: str, video_info: Dict) -> str:
     prompt = f"""Based on the following processed transcript and video information, create a comprehensive blog post. The blog post should include:
 
 1. Title
@@ -187,15 +145,15 @@ Please format the blog post accordingly, ensuring all relevant information from 
 """
 
     try:
-        response = openai.ChatCompletion.create(
-            model="gpt-4",
+        response = await openai.ChatCompletion.acreate(
+            model="gpt-4o-mini",
             messages=[
                 {"role": "system", "content": "You are a helpful assistant that creates detailed blog posts from video transcripts and information."},
                 {"role": "user", "content": prompt}
             ],
             max_tokens=3500
         )
-        return response.choices[0].message['content']
+        return response.choices[0].message.content
     except Exception as e:
         return f"An error occurred while generating the blog post: {str(e)}"
 
@@ -377,8 +335,8 @@ if st.button("Process Transcript and Generate Blog Post"):
                 transcript = get_video_transcript_with_timestamps(video_id)
                 comments = get_all_comments(video_id)
                 if isinstance(transcript, list) and isinstance(comments, list):
-                    processed_transcript = process_full_transcript(transcript, video_id)
-                    blog_post = generate_blog_post(processed_transcript, video_info)
+                    processed_transcript = asyncio.run(process_full_transcript(transcript, video_id))
+                    blog_post = asyncio.run(generate_blog_post(processed_transcript, video_info))
                     formatted_blog_post = format_blog_post(blog_post, video_info)
                     
                     # Display the blog post content
