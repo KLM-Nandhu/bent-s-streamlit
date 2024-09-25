@@ -153,8 +153,6 @@ def fetch_transcript_with_selenium(video_id: str) -> List[Dict]:
         driver.quit()
 
 def fetch_transcript_from_third_party(video_id: str) -> List[Dict]:
-    # This is a placeholder for a hypothetical third-party service
-    # You would need to replace this with an actual API call to a service that provides YouTube transcripts
     api_url = f"https://api.transcriptservice.com/v1/youtube/{video_id}"
     response = requests.get(api_url)
     if response.status_code == 200:
