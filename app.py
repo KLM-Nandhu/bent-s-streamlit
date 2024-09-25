@@ -312,18 +312,17 @@ st.markdown("""
         padding: 2rem;
     }
     .stButton>button {
-        width: 10%;
+        width: 30%;
         background-color: #3498db;
-        color: white;
         border: none;
         padding: 12px 20px;
         text-align: center;
         text-decoration: none;
         display: inline-block;
         font-size: 18px;
-        margin: 4px 2px;
+        margin: 2px;
         cursor: pointer;
-        border-radius: 5px;
+        border-radius: 2px;
         transition: all 0.3s ease;
     }
     .stButton>button:hover {
