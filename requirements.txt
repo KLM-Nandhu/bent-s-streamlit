@@ -1,7 +1,7 @@
 streamlit==1.22.0
+google-api-python-client==2.86.0
 youtube_transcript_api==0.6.0
 openai==0.27.8
-google-api-python-client==2.86.0
 requests==2.31.0
-python-dotenv==1.0.0
-asyncio==3.4.3
+selenium==4.9.1
+beautifulsoup4==4.12.2
