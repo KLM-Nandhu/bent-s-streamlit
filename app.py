@@ -3,6 +3,7 @@ from typing import List, Dict
 import asyncio
 import openai
 from googleapiclient.discovery import build
+from youtube_transcript_api import YouTubeTranscriptApi
 import re
 from html import unescape
 from datetime import datetime
@@ -13,6 +14,13 @@ YOUTUBE_API_KEY = st.secrets["YOUTUBE_API_KEY"]
 
 # YouTube API setup
 youtube = build('youtube', 'v3', developerKey=YOUTUBE_API_KEY)
+
+def get_video_transcript_with_timestamps(video_id: str) -> List[Dict]:
+    try:
+        transcript = YouTubeTranscriptApi.get_transcript(video_id)
+        return transcript
+    except Exception as e:
+        return f"An error occurred while fetching the transcript: {str(e)}"
 
 def get_video_info(video_id: str) -> Dict:
     try:
