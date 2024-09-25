@@ -1,7 +1,8 @@
 import streamlit as st
 import openai
-from typing import List, Dict
+from typing import List, Dict, Tuple
 import asyncio
+import aiohttp
 import requests
 from io import BytesIO
 from datetime import datetime
@@ -15,6 +16,7 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from bs4 import BeautifulSoup
+from functools import lru_cache
 
 # Set your API keys here
 openai.api_key = st.secrets["OPENAI_API_KEY"]
@@ -22,6 +24,7 @@ YOUTUBE_API_KEY = st.secrets["YOUTUBE_API_KEY"]
 
 youtube = build('youtube', 'v3', developerKey=YOUTUBE_API_KEY)
 
+@lru_cache(maxsize=100)
 def get_video_info(video_id: str) -> Dict:
     try:
         response = youtube.videos().list(
@@ -43,36 +46,47 @@ def get_video_info(video_id: str) -> Dict:
     except Exception as e:
         return f"An error occurred while fetching video info: {str(e)}"
 
-def get_all_comments(video_id: str) -> List[Dict]:
+async def get_comments_page(session, video_id: str, page_token: str = None) -> Tuple[List[Dict], str]:
     try:
-        comments = []
-        nextPageToken = None
-        while True:
-            response = youtube.commentThreads().list(
-                part='snippet',
-                videoId=video_id,
-                maxResults=100,
-                pageToken=nextPageToken,
-                order='time'
-            ).execute()
+        url = f"https://www.googleapis.com/youtube/v3/commentThreads?part=snippet&videoId={video_id}&key={YOUTUBE_API_KEY}&maxResults=100&order=time"
+        if page_token:
+            url += f"&pageToken={page_token}"
+        
+        async with session.get(url) as response:
+            data = await response.json()
+            
+        comments = [
+            {
+                'author': item['snippet']['topLevelComment']['snippet']['authorDisplayName'],
+                'text': item['snippet']['topLevelComment']['snippet']['textDisplay'],
+                'likes': item['snippet']['topLevelComment']['snippet']['likeCount'],
+                'published_at': item['snippet']['topLevelComment']['snippet']['publishedAt']
+            }
+            for item in data['items']
+        ]
 
-            for item in response['items']:
-                comment = item['snippet']['topLevelComment']['snippet']
-                comments.append({
-                    'author': comment['authorDisplayName'],
-                    'text': comment['textDisplay'],
-                    'likes': comment['likeCount'],
-                    'published_at': comment['publishedAt']
-                })
+        next_page_token = data.get('nextPageToken')
+        return comments, next_page_token
 
-            nextPageToken = response.get('nextPageToken')
-            if not nextPageToken:
-                break
-
-        return comments
     except Exception as e:
-        return f"An error occurred while fetching comments: {str(e)}"
+        return f"An error occurred while fetching comments: {str(e)}", None
 
+async def get_all_comments(video_id: str) -> List[Dict]:
+    async with aiohttp.ClientSession() as session:
+        all_comments = []
+        next_page_token = None
+        
+        while True:
+            comments, next_page_token = await get_comments_page(session, video_id, next_page_token)
+            if isinstance(comments, list):
+                all_comments.extend(comments)
+            
+            if not next_page_token:
+                break
+        
+        return all_comments
+
+@lru_cache(maxsize=100)
 def get_video_transcript_with_timestamps(video_id: str) -> List[Dict]:
     methods = [
         fetch_transcript_directly,
@@ -186,49 +200,29 @@ def format_time(seconds: float) -> str:
     minutes, seconds = divmod(remainder, 60)
     return f"{hours:02d}:{minutes:02d}:{seconds:02d}"
 
-async def process_transcript_chunk(chunk: str, video_id: str) -> str:
-    prompt = f"""This is a portion of a video transcript. Please organize this content into the following structure:
+def chunk_transcript(transcript: List[Dict], chunk_size: int = 1000) -> List[str]:
+    full_text = " ".join(f"{format_time(entry['start'])}: {entry['text']}" for entry in transcript)
+    return [full_text[i:i+chunk_size] for i in range(0, len(full_text), chunk_size)]
 
-For each distinct topic or section, include:
-Product name (if applicable):
-Starting timestamp:
-Ending Timestamp:
-Transcript:
-
-The goal is to not summarize or alter any information, but just reorganize the existing transcript into this structure.GIVE 5 TO 8 lines for individual timestamp. Use the provided timestamps to determine the start and end times for each section.
-
-Here's the transcript chunk:
-{chunk}
-
-Please format the response as follows:
-
-[Organized content here]
-"""
-
+async def process_transcript_chunk(chunk: str) -> str:
+    prompt = f"Summarize this transcript chunk: {chunk}"
     try:
         response = await openai.ChatCompletion.acreate(
-            model="gpt-4o-mini",
+            model="gpt-3.5-turbo",  # Use a faster model for initial processing
             messages=[
-                {"role": "system", "content": "You are a helpful assistant that organizes video transcripts without altering their content."},
+                {"role": "system", "content": "You are a helpful assistant that summarizes video transcripts."},
                 {"role": "user", "content": prompt}
             ],
-            max_tokens=2000
+            max_tokens=150  # Limit the response size
         )
         return response.choices[0].message.content
     except Exception as e:
-        return f"An error occurred while processing with GPT-4: {str(e)}"
+        return f"An error occurred while processing with GPT-3.5-turbo: {str(e)}"
 
-async def process_full_transcript(transcript: List[Dict], video_id: str) -> str:
-    chunk_size = 10000  # Adjust this value based on your needs
-    full_transcript = " ".join([f"{format_time(entry['start'])}: {entry['text']}" for entry in transcript])
-    chunks = [full_transcript[i:i+chunk_size] for i in range(0, len(full_transcript), chunk_size)]
-    
-    processed_chunks = []
-    for chunk in chunks:
-        processed_chunk = await process_transcript_chunk(chunk, video_id)
-        processed_chunks.append(processed_chunk)
-    
-    return "\n\n".join(processed_chunks)
+async def process_full_transcript(transcript: List[Dict]) -> str:
+    chunks = chunk_transcript(transcript)
+    summaries = await asyncio.gather(*[process_transcript_chunk(chunk) for chunk in chunks])
+    return " ".join(summaries)
 
 async def generate_blog_post(processed_transcript: str, video_info: Dict) -> str:
     prompt = f"""Based on the following processed transcript and video information, create a comprehensive blog post. The blog post should include:
@@ -255,7 +249,7 @@ Please format the blog post accordingly, ensuring all relevant information from 
         response = await openai.ChatCompletion.acreate(
             model="gpt-4o-mini",
             messages=[
-                {"role": "system", "content": "You are a helpful assistant that creates detailed blog posts from video transcripts and information.make the thumbnail image into center.make a quick responce.make a quick responce. if it take above 20 seconds give some extra warning message for please wait.and finally give the total time taken for the total responds."},
+                {"role": "system", "content": "You are a helpful assistant that creates detailed blog posts from video transcripts and information."},
                 {"role": "user", "content": prompt}
             ],
             max_tokens=3500
@@ -295,6 +289,22 @@ def format_blog_post(blog_post: str, video_info: Dict) -> str:
     
     return formatted_post
 
+async def process_video(video_id: str):
+    video_info = get_video_info(video_id)
+    transcript = get_video_transcript_with_timestamps(video_id)
+    
+    # Run these tasks concurrently
+    comments_task = asyncio.create_task(get_all_comments(video_id))
+    transcript_task = asyncio.create_task(process_full_transcript(transcript))
+    
+    comments = await comments_task
+    processed_transcript = await transcript_task
+    
+    blog_post = await generate_blog_post(processed_transcript, video_info)
+    formatted_blog_post = format_blog_post(blog_post, video_info)
+    
+    return video_info, formatted_blog_post, comments
+
 st.set_page_config(layout="wide")
 st.markdown("""
 <style>
@@ -307,16 +317,13 @@ st.markdown("""
         background-color: #f0f2f5;
     }
     .main {
-        max-width: 800px;
+        max-width: 1200px;
         margin: 0 auto;
-        background-color: white;
         padding: 2rem;
-        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-        border-radius: 8px;
     }
     .stButton>button {
         width: 100%;
-        background-color: #4CAF50;
+        background-color: #3498db;
         color: white;
         border: none;
         padding: 12px 20px;
@@ -327,13 +334,19 @@ st.markdown("""
         margin: 4px 2px;
         cursor: pointer;
         border-radius: 5px;
-        transition: background-color 0.3s;
+        transition: all 0.3s ease;
     }
     .stButton>button:hover {
-        background-color: #45a049;
+        background-color: #2980b9;
+        transform: translateY(-2px);
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
     }
-    .blog-post {
+    .content-container {
         margin-top: 2rem;
+        background-color: white;
+        padding: 2rem;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        border-radius: 8px;
     }
     .blog-post h1 {
         font-size: 2.8em;
@@ -370,12 +383,6 @@ st.markdown("""
         color: #7f8c8d;
         margin-bottom: 1em;
     }
-    .blog-content {
-        background-color: #fff;
-        padding: 20px;
-        border-radius: 8px;
-        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-    }
     .blog-image {
         max-width: 100%;
         height: auto;
@@ -383,9 +390,15 @@ st.markdown("""
         border-radius: 8px;
         box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
     }
+    .timestamp-image {
+        width: 320px;
+        height: 180px;
+        object-fit: cover;
+        border-radius: 4px;
+        margin: 10px 0;
+    }
     .comments-container {
-        max-width: 800px;
-        margin: 2rem auto;
+        margin-top: 2rem;
         border: 1px solid #e0e0e0;
         border-radius: 8px;
         padding: 20px;
@@ -426,6 +439,24 @@ st.markdown("""
     a:hover {
         text-decoration: underline;
     }
+    .loading-spinner {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        height: 100px;
+    }
+    .waiting-message {
+        text-align: center;
+        font-size: 1.2em;
+        color: #3498db;
+        margin-top: 20px;
+    }
+    .total-time {
+        text-align: right;
+        font-size: 0.9em;
+        color: #7f8c8d;
+        margin-top: 10px;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -436,58 +467,35 @@ video_id = st.text_input("Enter YouTube Video ID")
 if st.button("Click To Generate"):
     if video_id:
         start_time = time.time()
-        with st.spinner("Processing transcript and generating blog post..."):
-            video_info = get_video_info(video_id)
-            if isinstance(video_info, dict):
-                transcript = get_video_transcript_with_timestamps(video_id)
-                comments = get_all_comments(video_id)
-                if isinstance(transcript, list) and isinstance(comments, list):
-                    processed_transcript = asyncio.run(process_full_transcript(transcript, video_id))
-                    
-                    # Add waiting message for longer responses
-                    waiting_message = st.empty()
-                    if time.time() - start_time > 20:
-                        waiting_message.markdown("<div class='waiting-message'>Please wait, we're still working on your request. This may take a few more moments.</div>", unsafe_allow_html=True)
-                    
-                    blog_post = asyncio.run(generate_blog_post(processed_transcript, video_info))
-                    formatted_blog_post = format_blog_post(blog_post, video_info)
-                    
-                    # Clear waiting message
-                    waiting_message.empty()
-                    
-                    # Display the entire content in one container
-                    st.markdown("<div class='content-container'>", unsafe_allow_html=True)
-                    
-                    # Display the blog post content
-                    st.markdown("<div class='blog-post'>", unsafe_allow_html=True)
-                    st.markdown(formatted_blog_post, unsafe_allow_html=True)
-                    st.markdown("</div>", unsafe_allow_html=True)
-                    
-                    # Display comments
-                    st.markdown("<div class='comments-container'>", unsafe_allow_html=True)
-                    st.markdown("<h2>Comments</h2>", unsafe_allow_html=True)
-                    st.markdown("<div class='comments-scrollable'>", unsafe_allow_html=True)
-                    for comment in comments:
-                        st.markdown(f"""
-                        <div class="comment">
-                            <div class="comment-author">{comment['author']}</div>
-                            <div class="comment-date">{comment['published_at']}</div>
-                            <div class="comment-text">{comment['text']}</div>
-                            <div class="comment-likes">:+1: {comment['likes']}</div>
-                        </div>
-                        """, unsafe_allow_html=True)
-                    st.markdown("</div>", unsafe_allow_html=True)
-                    st.markdown("</div>", unsafe_allow_html=True)
-                    
-                    # Display total time taken
-                    end_time = time.time()
-                    total_time = end_time - start_time
-                    st.markdown(f"<div class='total-time'>Total time taken: {total_time:.2f} seconds</div>", unsafe_allow_html=True)
-                    
-                    st.markdown("</div>", unsafe_allow_html=True)
-                else:
-                    st.error(transcript if isinstance(transcript, str) else comments)
-            else:
-                st.error(video_info)
+        with st.spinner("Processing video..."):
+            video_info, formatted_blog_post, comments = asyncio.run(process_video(video_id))
+            
+            # Display the content
+            st.markdown("<div class='content-container'>", unsafe_allow_html=True)
+            
+            st.markdown("<div class='blog-post'>", unsafe_allow_html=True)
+            st.markdown(formatted_blog_post, unsafe_allow_html=True)
+            st.markdown("</div>", unsafe_allow_html=True)
+            
+            st.markdown("<div class='comments-container'>", unsafe_allow_html=True)
+            st.markdown("<h2>Comments</h2>", unsafe_allow_html=True)
+            st.markdown("<div class='comments-scrollable'>", unsafe_allow_html=True)
+            for comment in comments[:100]:  # Limit to first 100 comments for performance
+                st.markdown(f"""
+                <div class="comment">
+                    <div class="comment-author">{comment['author']}</div>
+                    <div class="comment-date">{comment['published_at']}</div>
+                    <div class="comment-text">{comment['text']}</div>
+                    <div class="comment-likes">👍 {comment['likes']}</div>
+                </div>
+                """, unsafe_allow_html=True)
+            st.markdown("</div>", unsafe_allow_html=True)
+            st.markdown("</div>", unsafe_allow_html=True)
+            
+            end_time = time.time()
+            total_time = end_time - start_time
+            st.markdown(f"<div class='total-time'>Total time taken: {total_time:.2f} seconds</div>", unsafe_allow_html=True)
+            
+            st.markdown("</div>", unsafe_allow_html=True)
     else:
         st.error("Please enter a YouTube Video ID.")
