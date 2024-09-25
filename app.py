@@ -418,6 +418,14 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
+import streamlit as st
+import time
+import openai
+from typing import List, Dict
+
+# Assuming the previous imports and functions are defined here
+# ...
+
 st.title("BENT-S-BLOG")
 
 video_id = st.text_input("Enter YouTube Video ID")
@@ -430,6 +438,8 @@ if st.button("Click To Generate"):
             if isinstance(video_info, dict):
                 transcript = get_video_transcript_with_timestamps(video_id)
                 comments = get_all_comments(video_id)
+
+                # Check if comments are a valid list
                 if isinstance(transcript, list) and isinstance(comments, list):
                     processed_transcript = asyncio.run(process_full_transcript(transcript, video_id))
                     
@@ -452,24 +462,33 @@ if st.button("Click To Generate"):
                     st.markdown(formatted_blog_post, unsafe_allow_html=True)
                     st.markdown("</div>", unsafe_allow_html=True)
 
-# Container for comments
-st.markdown("<div class='comment-container'>", unsafe_allow_html=True)
+                # Container for comments
+                if isinstance(comments, list):
+                    st.markdown("<div class='comment-container'>", unsafe_allow_html=True)
+                    
+                    # Loop to display comments
+                    for comment in comments:
+                        st.markdown(f"""
+                        <div class="comment">
+                            <div class="comment-author">{comment['author']}</div>
+                            <div class="comment-date">{comment['published_at']}</div>
+                            <div class="comment-text">{comment['text']}</div>
+                            <div class="comment-likes">:+1: {comment['likes']}</div>
+                        </div>
+                        """, unsafe_allow_html=True)
+                    
+                    # Close the comment container
+                    st.markdown("</div>", unsafe_allow_html=True)
 
-# Loop to display comments
-for comment in comments:
-    st.markdown(f"""
-    <div class="comment">
-        <div class="comment-author">{comment['author']}</div>
-        <div class="comment-date">{comment['published_at']}</div>
-        <div class="comment-text">{comment['text']}</div>
-        <div class="comment-likes">:+1: {comment['likes']}</div>
-    </div>
-    """, unsafe_allow_html=True)
+                else:
+                    st.error("Failed to retrieve comments.")
+                
+                # Display total time taken
+                end_time = time.time()
+                total_time = end_time - start_time
+                st.markdown(f"<div class='total-time'>Total time taken: {total_time:.2f} seconds</div>", unsafe_allow_html=True)
+            else:
+                st.error(video_info)
+    else:
+        st.error("Please enter a YouTube Video ID.")
 
-# Close the comment container
-st.markdown("</div>", unsafe_allow_html=True)
-
-# Display total time taken
-end_time = time.time()
-total_time = end_time - start_time
-st.markdown(f"<div class='total-time'>Total time taken: {total_time:.2f} seconds</div>", unsafe_allow_html=True)
