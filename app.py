@@ -154,7 +154,6 @@ def fetch_transcript_with_selenium(video_id: str) -> List[Dict]:
 
 def fetch_transcript_from_third_party(video_id: str) -> List[Dict]:
     # This is a placeholder for a hypothetical third-party service
-    # You would need to replace this with an actual API call to a service that provides YouTube transcripts
     api_url = f"https://api.transcriptservice.com/v1/youtube/{video_id}"
     response = requests.get(api_url)
     if response.status_code == 200:
@@ -383,12 +382,17 @@ st.markdown("""
         border-radius: 8px;
         box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
     }
-   .comment-container {
-        max-height: 500px;
+    .comment-section {
+        margin-top: 2rem;
+    }
+    .comment-container {
+        height: 500px;
+        width: 500px;
         overflow-y: scroll;
         padding: 10px;
         border: 1px solid #ccc;
         background-color: #f9f9f9;
+        margin: 0 auto;
     }
     .comment {
         margin-bottom: 15px;
@@ -432,6 +436,7 @@ if st.button("Click To Generate"):
             if isinstance(video_info, dict):
                 transcript = get_video_transcript_with_timestamps(video_id)
                 comments = get_all_comments(video_id)
+
                 if isinstance(transcript, list) and isinstance(comments, list):
                     processed_transcript = asyncio.run(process_full_transcript(transcript, video_id))
                     
@@ -454,24 +459,38 @@ if st.button("Click To Generate"):
                     st.markdown(formatted_blog_post, unsafe_allow_html=True)
                     st.markdown("</div>", unsafe_allow_html=True)
 
-# Container for comments
-st.markdown("<div class='comment-container'>", unsafe_allow_html=True)
+                    # Comments Section
+                    st.markdown("<h2 class='comment-section'>Comments</h2>", unsafe_allow_html=True)
 
-# Loop to display comments
-for comment in comments:
-    st.markdown(f"""
-    <div class="comment">
-        <div class="comment-author">{comment['author']}</div>
-        <div class="comment-date">{comment['published_at']}</div>
-        <div class="comment-text">{comment['text']}</div>
-        <div class="comment-likes">:+1: {comment['likes']}</div>
-    </div>
-    """, unsafe_allow_html=True)
-
-# Close the comment container
-st.markdown("</div>", unsafe_allow_html=True)
-
-# Display total time taken
-end_time = time.time()
-total_time = end_time - start_time
-st.markdown(f"<div class='total-time'>Total time taken: {total_time:.2f} seconds</div>", unsafe_allow_html=True)
+                    # Container for comments
+                    if isinstance(comments, list):
+                        st.markdown("<div class='comment-container'>", unsafe_allow_html=True)
+                        
+                        # Loop to display comments
+                        for comment in comments:
+                            # Make text between asterisks bold
+                            formatted_text = re.sub(r'\*(.*?)\*', r'<strong>\1</strong>', comment['text'])
+                            st.markdown(f"""
+                            <div class="comment">
+                                <div class="comment-author">{comment['author']}</div>
+                                <div class="comment-date">{comment['published_at']}</div>
+                                <div class="comment-text">{formatted_text}</div>
+                                <div class="comment-likes">👍 {comment['likes']}</div>
+                            </div>
+                            """, unsafe_allow_html=True)
+                        
+                        # Close the comment container
+                        st.markdown("</div>", unsafe_allow_html=True)
+                    else:
+                        st.error("Failed to retrieve comments.")
+                    
+                    # Display total time taken
+                    end_time = time.time()
+                    total_time = end_time - start_time
+                    st.markdown(f"<div class='total-time'>Total time taken: {total_time:.2f} seconds</div>", unsafe_allow_html=True)
+                else:
+                    st.error("Failed to retrieve transcript or comments.")
+            else:
+                st.error(video_info)
+    else:
+        st.error("Please enter a YouTube Video ID.")
