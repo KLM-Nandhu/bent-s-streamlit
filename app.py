@@ -185,10 +185,6 @@ def format_time(seconds: float) -> str:
     minutes, seconds = divmod(remainder, 60)
     return f"{hours:02d}:{minutes:02d}:{seconds:02d}"
 
-# Function to make text between * symbols bold
-def format_bold(text):
-    return re.sub(r'\*(.*?)\*', r'<strong>\1</strong>', text)
-
 async def process_transcript_chunk(chunk: str, video_id: str) -> str:
     prompt = f"""This is a portion of a video transcript. Please organize this content into the following structure:
 
@@ -355,7 +351,7 @@ st.markdown("""
         border-left: 4px solid #3498db;
         padding-left: 10px;
     }
-    .blog-post h3 {
+   .blog-post h3 {
         font-size: 1.8em;
         color: #34495e;
         margin-top: 1em;
@@ -386,13 +382,17 @@ st.markdown("""
         border-radius: 8px;
         box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
     }
-   .comment-container {
-        max-height: 500px;
-        max-width: 500px;
+    .comment-section {
+        margin-top: 2rem;
+    }
+    .comment-container {
+        height: 500px;
+        width: 500px;
         overflow-y: scroll;
         padding: 10px;
         border: 1px solid #ccc;
         background-color: #f9f9f9;
+        margin: 0 auto;
     }
     .comment {
         margin-bottom: 15px;
@@ -459,35 +459,37 @@ if st.button("Click To Generate"):
                     st.markdown(formatted_blog_post, unsafe_allow_html=True)
                     st.markdown("</div>", unsafe_allow_html=True)
 
-                # Comments Section Heading
-                st.markdown("<h2>Comments</h2>", unsafe_allow_html=True)
+                    # Comments Section
+                    st.markdown("<h2 class='comment-section'>Comments</h2>", unsafe_allow_html=True)
 
-                # Container for comments
-                if isinstance(comments, list):
-                    st.markdown("<div class='comment-container'>", unsafe_allow_html=True)
+                    # Container for comments
+                    if isinstance(comments, list):
+                        st.markdown("<div class='comment-container'>", unsafe_allow_html=True)
+                        
+                        # Loop to display comments
+                        for comment in comments:
+                            # Make text between asterisks bold
+                            formatted_text = re.sub(r'\*(.*?)\*', r'<strong>\1</strong>', comment['text'])
+                            st.markdown(f"""
+                            <div class="comment">
+                                <div class="comment-author">{comment['author']}</div>
+                                <div class="comment-date">{comment['published_at']}</div>
+                                <div class="comment-text">{formatted_text}</div>
+                                <div class="comment-likes">👍 {comment['likes']}</div>
+                            </div>
+                            """, unsafe_allow_html=True)
+                        
+                        # Close the comment container
+                        st.markdown("</div>", unsafe_allow_html=True)
+                    else:
+                        st.error("Failed to retrieve comments.")
                     
-                    # Loop to display comments
-                    for comment in comments:
-                        formatted_text = format_bold(comment['text'])  # Format text to make *bold* text bold
-                        st.markdown(f"""
-                        <div class="comment">
-                            <div class="comment-author">{comment['author']}</div>
-                            <div class="comment-date">{comment['published_at']}</div>
-                            <div class="comment-text">{formatted_text}</div>
-                            <div class="comment-likes">:+1: {comment['likes']}</div>
-                        </div>
-                        """, unsafe_allow_html=True)
-                    
-                    # Close the comment container
-                    st.markdown("</div>", unsafe_allow_html=True)
-
+                    # Display total time taken
+                    end_time = time.time()
+                    total_time = end_time - start_time
+                    st.markdown(f"<div class='total-time'>Total time taken: {total_time:.2f} seconds</div>", unsafe_allow_html=True)
                 else:
-                    st.error("Failed to retrieve comments.")
-                
-                # Display total time taken
-                end_time = time.time()
-                total_time = end_time - start_time
-                st.markdown(f"<div class='total-time'>Total time taken: {total_time:.2f} seconds</div>", unsafe_allow_html=True)
+                    st.error("Failed to retrieve transcript or comments.")
             else:
                 st.error(video_info)
     else:
