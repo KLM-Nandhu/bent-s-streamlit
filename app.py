@@ -309,7 +309,6 @@ st.set_page_config(layout="wide")
     .main {
         margin: 0 auto;
         background-color: white;
-        padding: 2rem;
         box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
         border-radius: 8px;
     }
