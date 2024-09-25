@@ -3,18 +3,23 @@ import openai
 from typing import List, Dict
 import asyncio
 import requests
-from io import BytesIO
 from datetime import datetime
-import base64
-from googleapiclient.discovery import build
 import re
-import html
+from youtube_transcript_api import YouTubeTranscriptApi
+from googleapiclient.discovery import build
 
 # Set your API keys here
 openai.api_key = st.secrets["OPENAI_API_KEY"]
 YOUTUBE_API_KEY = st.secrets["YOUTUBE_API_KEY"]
 
 youtube = build('youtube', 'v3', developerKey=YOUTUBE_API_KEY)
+
+def get_video_transcript_with_timestamps(video_id: str) -> List[Dict]:
+    try:
+        transcript = YouTubeTranscriptApi.get_transcript(video_id)
+        return transcript
+    except Exception as e:
+        return f"An error occurred while fetching the transcript: {str(e)}"
 
 def get_video_info(video_id: str) -> Dict:
     try:
@@ -67,60 +72,6 @@ def get_all_comments(video_id: str) -> List[Dict]:
     except Exception as e:
         return f"An error occurred while fetching comments: {str(e)}"
 
-def get_video_transcript_with_timestamps(video_id: str) -> List[Dict]:
-    try:
-        # First, get the caption tracks for the video
-        captions_response = youtube.captions().list(
-            part="snippet",
-            videoId=video_id
-        ).execute()
-
-        # Find the first English caption track (or default to the first available track)
-        caption_id = None
-        for item in captions_response['items']:
-            if item['snippet']['language'] == 'en':
-                caption_id = item['id']
-                break
-        if not caption_id:
-            caption_id = captions_response['items'][0]['id']
-
-        # Download the actual captions
-        subtitle = youtube.captions().download(
-            id=caption_id,
-            tfmt='srt'
-        ).execute()
-
-        # Decode the bytes object to a string
-        subtitle_text = subtitle.decode('utf-8')
-
-        # Parse the SRT format
-        transcript = []
-        for entry in subtitle_text.strip().split('\n\n'):
-            parts = entry.split('\n')
-            if len(parts) >= 3:
-                time_parts = parts[1].split(' --> ')
-                start_time = time_to_seconds(time_parts[0])
-                end_time = time_to_seconds(time_parts[1])
-                text = ' '.join(parts[2:])
-                transcript.append({
-                    'start': start_time,
-                    'duration': end_time - start_time,
-                    'text': html.unescape(text)
-                })
-
-        return transcript
-    except Exception as e:
-        return f"An error occurred while fetching the transcript: {str(e)}"
-
-def time_to_seconds(time_str: str) -> float:
-    h, m, s = time_str.split(':')
-    return int(h) * 3600 + int(m) * 60 + float(s.replace(',', '.'))
-
-def format_time(seconds: float) -> str:
-    hours, remainder = divmod(int(seconds), 3600)
-    minutes, seconds = divmod(remainder, 60)
-    return f"{hours:02d}:{minutes:02d}:{seconds:02d}"
-
 async def process_transcript_chunk(chunk: str, video_id: str) -> str:
     prompt = f"""This is a portion of a video transcript. Please organize this content into the following structure:
 
@@ -155,7 +106,7 @@ Please format the response as follows:
 
 async def process_full_transcript(transcript: List[Dict], video_id: str) -> str:
     chunk_size = 10000  # Adjust this value based on your needs
-    full_transcript = " ".join([f"{format_time(entry['start'])}: {entry['text']}" for entry in transcript])
+    full_transcript = " ".join([f"{entry['start']:.2f}: {entry['text']}" for entry in transcript])
     chunks = [full_transcript[i:i+chunk_size] for i in range(0, len(full_transcript), chunk_size)]
     
     processed_chunks = []
