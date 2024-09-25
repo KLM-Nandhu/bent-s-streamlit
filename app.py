@@ -8,8 +8,8 @@ from html import unescape
 from datetime import datetime
 
 # Set your API keys here
-openai.api_key = "your_openai_api_key_here"
-YOUTUBE_API_KEY = "your_youtube_api_key_here"
+openai.api_key = st.secrets["OPENAI_API_KEY"]
+YOUTUBE_API_KEY = st.secrets["YOUTUBE_API_KEY"]
 
 # YouTube API setup
 youtube = build('youtube', 'v3', developerKey=YOUTUBE_API_KEY)
