@@ -54,7 +54,8 @@ st.markdown("""
         font-weight: bold;
         border-radius: 8px;
         padding: 0.5rem 1rem;
-        width: 40%;
+        aligin
+        width: 50%;
     }
     .stButton>button:hover {
         background-color: #2980b9;
