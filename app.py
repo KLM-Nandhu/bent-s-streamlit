@@ -312,8 +312,8 @@ st.markdown("""
         padding: 2rem;
     }
     .stButton>button {
-        width: 30%;
-        background-color: #4CAF50;
+        width: 100%;
+        background-color: #3498db;
         color: white;
         border: none;
         padding: 12px 20px;
@@ -324,12 +324,14 @@ st.markdown("""
         margin: 4px 2px;
         cursor: pointer;
         border-radius: 5px;
-        transition: background-color 0.3s;
+        transition: all 0.3s ease;
     }
     .stButton>button:hover {
-        background-color: #45a049;
+        background-color: #2980b9;
+        transform: translateY(-2px);
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
     }
-    .blog-post {
+    .content-container {
         margin-top: 2rem;
         background-color: white;
         padding: 2rem;
@@ -433,6 +435,18 @@ st.markdown("""
         align-items: center;
         height: 100px;
     }
+    .waiting-message {
+        text-align: center;
+        font-size: 1.2em;
+        color: #3498db;
+        margin-top: 20px;
+    }
+    .total-time {
+        text-align: right;
+        font-size: 0.9em;
+        color: #7f8c8d;
+        margin-top: 10px;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -442,6 +456,7 @@ video_id = st.text_input("Enter YouTube Video ID")
 
 if st.button("Click To Generate"):
     if video_id:
+        start_time = time.time()
         with st.spinner("Processing transcript and generating blog post..."):
             video_info = get_video_info(video_id)
             if isinstance(video_info, dict):
@@ -449,34 +464,51 @@ if st.button("Click To Generate"):
                 comments = get_all_comments(video_id)
                 if isinstance(transcript, list) and isinstance(comments, list):
                     processed_transcript = asyncio.run(process_full_transcript(transcript, video_id))
+                    
+                    # Add waiting message for longer responses
+                    waiting_message = st.empty()
+                    if time.time() - start_time > 20:
+                        waiting_message.markdown("<div class='waiting-message'>Please wait, we're still working on your request. This may take a few more moments.</div>", unsafe_allow_html=True)
+                    
                     blog_post = asyncio.run(generate_blog_post(processed_transcript, video_info))
                     formatted_blog_post = format_blog_post(blog_post, video_info)
                     
+                    # Clear waiting message
+                    waiting_message.empty()
+                    
+                    # Display the entire content in one container
+                    st.markdown("<div class='content-container'>", unsafe_allow_html=True)
+                    
                     # Display the blog post content
                     st.markdown("<div class='blog-post'>", unsafe_allow_html=True)
-                    st.markdown("<div class='blog-content'>", unsafe_allow_html=True)
                     st.markdown(formatted_blog_post, unsafe_allow_html=True)
                     st.markdown("</div>", unsafe_allow_html=True)
-                    st.markdown("</div>", unsafe_allow_html=True)
                     
-                    # Display comments in a separate container with internal scrolling
+                    # Display comments
                     st.markdown("<div class='comments-container'>", unsafe_allow_html=True)
                     st.markdown("<h2>Comments</h2>", unsafe_allow_html=True)
                     st.markdown("<div class='comments-scrollable'>", unsafe_allow_html=True)
                     for comment in comments:
                         st.markdown(f"""
-        <div class="comment">
-            <div class="comment-author">{comment['author']}</div>
-            <div class="comment-date">{comment['published_at']}</div>
-            <div class="comment-text">{comment['text']}</div>
-            <div class="comment-likes">:+1: {comment['likes']}</div>
-        </div>
-        """, unsafe_allow_html=True)
+                        <div class="comment">
+                            <div class="comment-author">{comment['author']}</div>
+                            <div class="comment-date">{comment['published_at']}</div>
+                            <div class="comment-text">{comment['text']}</div>
+                            <div class="comment-likes">:+1: {comment['likes']}</div>
+                        </div>
+                        """, unsafe_allow_html=True)
                     st.markdown("</div>", unsafe_allow_html=True)
+                    st.markdown("</div>", unsafe_allow_html=True)
+                    
+                    # Display total time taken
+                    end_time = time.time()
+                    total_time = end_time - start_time
+                    st.markdown(f"<div class='total-time'>Total time taken: {total_time:.2f} seconds</div>", unsafe_allow_html=True)
+                    
                     st.markdown("</div>", unsafe_allow_html=True)
                 else:
                     st.error(transcript if isinstance(transcript, str) else comments)
             else:
                 st.error(video_info)
     else:
-         st.error("Please enter a YouTube Video ID.")
+        st.error("Please enter a YouTube Video ID.")
