@@ -49,12 +49,12 @@ st.markdown("""
         margin-bottom: 2rem;
     }
     .stButton>button {
-        background-color: #90EE90;
-        color: black;
+        background-color: #3498db;
+        color: white;
         font-weight: bold;
-        border-radius: 8px;
+        border-radius: 5px;
         padding: 0.5rem 1rem;
-        width: 30%;
+        width: 100%;
     }
     .stButton>button:hover {
         background-color: #2980b9;
@@ -288,9 +288,9 @@ Please format the response as follows:
 
     try:
         response = await openai.ChatCompletion.acreate(
-            model="gpt-4o-mini",
+            model="gpt-3.5-turbo",
             messages=[
-                {"role": "system", "content": "You are a helpful assistant that organizes video transcripts without altering their content.The responce time is should not above 20seconds of every single request."},
+                {"role": "system", "content": "You are a helpful assistant that organizes video transcripts without altering their content."},
                 {"role": "user", "content": prompt}
             ],
             max_tokens=2000
@@ -332,9 +332,9 @@ Please format the blog post accordingly, ensuring all relevant information from 
 
     try:
         response = await openai.ChatCompletion.acreate(
-            model="gpt-4o-mini",
+            model="gpt-3.5-turbo-16k",
             messages=[
-                {"role": "system", "content": "You are a helpful assistant that creates detailed blog posts from video transcripts and information.The responce time is should not above 20seconds of every single request."},
+                {"role": "system", "content": "You are a helpful assistant that creates detailed blog posts from video transcripts and information."},
                 {"role": "user", "content": prompt}
             ],
             max_tokens=3500
@@ -380,10 +380,10 @@ async def main():
     col1, col2, col3 = st.columns([1,2,1])
     with col2:
         video_id = st.text_input("Enter YouTube Video ID")
-        process_button = st.button("Generate")
+        process_button = st.button("Generate Blog Post")
 
     if process_button and video_id:
-        with st.spinner("It's take few Seconds Please Wait..."):
+        with st.spinner("Processing video and generating blog post..."):
             start_time = time.time()
             
             # Concurrent fetching of video info, transcript, and comments
