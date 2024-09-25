@@ -296,8 +296,9 @@ def format_blog_post(blog_post: str, video_info: Dict) -> str:
     return formatted_post
 
 st.set_page_config(layout="wide")
+import streamlit as st
 
-
+st.set_page_config(layout="wide")
 
 st.markdown("""
 <style>
@@ -315,7 +316,7 @@ st.markdown("""
         padding: 2rem;
     }
     .stButton>button {
-        width: 30%;
+        width: 100%;
         background-color: #4CAF50;
         color: white;
         border: none;
@@ -332,19 +333,23 @@ st.markdown("""
     .stButton>button:hover {
         background-color: #45a049;
     }
-    .blog-post {
-        margin-top: 2rem;
+    .container {
         background-color: white;
         padding: 2rem;
         box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
         border-radius: 8px;
+        margin-bottom: 2rem;
+    }
+    .container h2 {
+        color: #2c3e50;
+        border-bottom: 2px solid #3498db;
+        padding-bottom: 10px;
+        margin-bottom: 1rem;
     }
     .blog-post h1 {
         font-size: 2.8em;
         color: #2c3e50;
         margin-bottom: 0.5em;
-        border-bottom: 2px solid #3498db;
-        padding-bottom: 10px;
         font-weight: 700;
     }
     .blog-post h2 {
@@ -388,19 +393,12 @@ st.markdown("""
         border-radius: 4px;
         margin: 10px 0;
     }
-    .comments-container {
-        margin-top: 2rem;
-        border: 1px solid #e0e0e0;
-        border-radius: 8px;
-        padding: 20px;
-        background-color: #f9f9f9;
-    }
     .comments-scrollable {
         max-height: 500px;
         overflow-y: auto;
     }
     .comment {
-        background-color: #ffffff;
+        background-color: #f9f9f9;
         border-left: 4px solid #3498db;
         padding: 15px;
         margin-bottom: 15px;
@@ -441,45 +439,39 @@ st.markdown("""
 
 st.title("BENT-S-BLOG")
 
-video_id = st.text_input("Enter YouTube Video ID")
+# Input Container
+with st.container():
+    st.markdown("<div class='container'>", unsafe_allow_html=True)
+    st.markdown("<h2>Enter YouTube Video ID</h2>", unsafe_allow_html=True)
+    video_id = st.text_input("", placeholder="Enter YouTube Video ID here")
+    if st.button("Generate Blog Post"):
+        if video_id:
+            with st.spinner("Processing transcript and generating blog post..."):
+                # Your existing processing code here
+                pass
+        else:
+            st.error("Please enter a YouTube Video ID.")
+    st.markdown("</div>", unsafe_allow_html=True)
 
-if st.button("Click To Generate"):
-    if video_id:
-        with st.spinner("Processing transcript and generating blog post..."):
-            video_info = get_video_info(video_id)
-            if isinstance(video_info, dict):
-                transcript = get_video_transcript_with_timestamps(video_id)
-                comments = get_all_comments(video_id)
-                if isinstance(transcript, list) and isinstance(comments, list):
-                    processed_transcript = asyncio.run(process_full_transcript(transcript, video_id))
-                    blog_post = asyncio.run(generate_blog_post(processed_transcript, video_info))
-                    formatted_blog_post = format_blog_post(blog_post, video_info)
-                    
-                    # Display the blog post content
-                    st.markdown("<div class='blog-post'>", unsafe_allow_html=True)
-                    st.markdown("<div class='blog-content'>", unsafe_allow_html=True)
-                    st.markdown(formatted_blog_post, unsafe_allow_html=True)
-                    st.markdown("</div>", unsafe_allow_html=True)
-                    st.markdown("</div>", unsafe_allow_html=True)
-                    
-                    # Display comments in a separate container with internal scrolling
-                    st.markdown("<div class='comments-container'>", unsafe_allow_html=True)
-                    st.markdown("<h2>Comments</h2>", unsafe_allow_html=True)
-                    st.markdown("<div class='comments-scrollable'>", unsafe_allow_html=True)
-                    for comment in comments:
-                        st.markdown(f"""
-        <div class="comment">
-            <div class="comment-author">{comment['author']}</div>
-            <div class="comment-date">{comment['published_at']}</div>
-            <div class="comment-text">{comment['text']}</div>
-            <div class="comment-likes">:+1: {comment['likes']}</div>
-        </div>
-        """, unsafe_allow_html=True)
-                    st.markdown("</div>", unsafe_allow_html=True)
-                    st.markdown("</div>", unsafe_allow_html=True)
-                else:
-                    st.error(transcript if isinstance(transcript, str) else comments)
-            else:
-                st.error(video_info)
-    else:
-         st.error("Please enter a YouTube Video ID.")
+# Blog Post Container
+with st.container():
+    st.markdown("<div class='container blog-post'>", unsafe_allow_html=True)
+    st.markdown("<h2>Generated Blog Post</h2>", unsafe_allow_html=True)
+    # Your code to display the formatted blog post here
+    st.markdown("</div>", unsafe_allow_html=True)
+
+# Comments Container
+with st.container():
+    st.markdown("<div class='container'>", unsafe_allow_html=True)
+    st.markdown("<h2>Video Comments</h2>", unsafe_allow_html=True)
+    st.markdown("<div class='comments-scrollable'>", unsafe_allow_html=True)
+    # Your code to display comments here
+    st.markdown("</div>", unsafe_allow_html=True)
+    st.markdown("</div>", unsafe_allow_html=True)
+
+# Video Info Container
+with st.container():
+    st.markdown("<div class='container'>", unsafe_allow_html=True)
+    st.markdown("<h2>Video Information</h2>", unsafe_allow_html=True)
+    # Add code to display video information (title, description, views, likes, etc.)
+    st.markdown("</div>", unsafe_allow_html=True)
