@@ -2,7 +2,7 @@ import streamlit as st
 import openai
 from typing import List, Dict
 import asyncio
-import aiohttp
+import requests
 from io import BytesIO
 from datetime import datetime
 import base64
@@ -26,11 +26,11 @@ youtube = build('youtube', 'v3', developerKey=YOUTUBE_API_KEY)
 # Improved CSS for better UI
 st.markdown("""
 <style>
-    @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;700&family=Playfair+Display:wght@700&display=swap');
     
     body {
-        font-family: 'Poppins', sans-serif;
-        background-color: #f0f4f8;
+        font-family: 'Roboto', sans-serif;
+        background-color: #f0f2f5;
         color: #333;
         line-height: 1.6;
     }
@@ -43,33 +43,31 @@ st.markdown("""
         padding-bottom: 2rem;
     }
     h1 {
-        font-weight: 700;
+        font-family: 'Playfair Display', serif;
         color: #2c3e50;
         text-align: center;
         margin-bottom: 2rem;
     }
     .stButton>button {
-        background-color: #3498db;
-        color: white;
-        font-weight: 600;
-        border-radius: 25px;
-        padding: 0.5rem 2rem;
-        font-size: 1.1em;
-        transition: all 0.3s ease;
+        background-color: #90EE90;
+        color: black;
+        font-weight: bold;
+        border-radius: 8px;
+        padding: 0.5rem 1rem;
+        width: 30%;
     }
     .stButton>button:hover {
         background-color: #2980b9;
-        transform: translateY(-2px);
     }
     .blog-container {
         background-color: white;
         padding: 2rem;
-        border-radius: 15px;
+        border-radius: 10px;
         box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
         margin-top: 2rem;
     }
     .blog-title {
-        font-weight: 700;
+        font-family: 'Playfair Display', serif;
         font-size: 2.5em;
         color: #2c3e50;
         text-align: center;
@@ -86,76 +84,78 @@ st.markdown("""
         height: auto;
         margin: 1rem auto;
         display: block;
-        border-radius: 10px;
+        border-radius: 5px;
     }
     .blog-content h2 {
-        font-weight: 600;
+        font-family: 'Playfair Display', serif;
         color: #2c3e50;
         margin-top: 1.5rem;
     }
     .blog-content p {
         margin-bottom: 1rem;
-        font-weight: 300;
     }
     .comment {
-        background-color: #f8f9fa;
+        background-color: #f9f9f9;
         border-left: 4px solid #3498db;
         padding: 1rem;
         margin-bottom: 1rem;
         border-radius: 5px;
     }
-    .center-content {
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        flex-direction: column;
-    }
 </style>
 """, unsafe_allow_html=True)
 
 @st.cache_data(ttl=3600)
-async def get_video_info(video_id: str) -> Dict:
-    async with aiohttp.ClientSession() as session:
-        async with session.get(f"https://www.googleapis.com/youtube/v3/videos?part=snippet,statistics,contentDetails&id={video_id}&key={YOUTUBE_API_KEY}") as response:
-            data = await response.json()
-            video_data = data['items'][0]
-            return {
-                'id': video_id,
-                'title': video_data['snippet']['title'],
-                'description': video_data['snippet']['description'],
-                'thumbnail_url': video_data['snippet']['thumbnails']['high']['url'],
-                'view_count': video_data['statistics']['viewCount'],
-                'like_count': video_data['statistics'].get('likeCount', 'N/A'),
-                'duration': video_data['contentDetails']['duration'],
-                'published_at': video_data['snippet']['publishedAt']
-            }
+def get_video_info(video_id: str) -> Dict:
+    try:
+        response = youtube.videos().list(
+            part='snippet,statistics,contentDetails',
+            id=video_id
+        ).execute()
+
+        video_data = response['items'][0]
+        return {
+            'id': video_id,
+            'title': video_data['snippet']['title'],
+            'description': video_data['snippet']['description'],
+            'thumbnail_url': video_data['snippet']['thumbnails']['high']['url'],
+            'view_count': video_data['statistics']['viewCount'],
+            'like_count': video_data['statistics']['likeCount'],
+            'duration': video_data['contentDetails']['duration'],
+            'published_at': video_data['snippet']['publishedAt']
+        }
+    except Exception as e:
+        return f"An error occurred while fetching video info: {str(e)}"
 
 @st.cache_data(ttl=3600)
-async def get_all_comments(video_id: str) -> List[Dict]:
-    async with aiohttp.ClientSession() as session:
+def get_all_comments(video_id: str) -> List[Dict]:
+    try:
         comments = []
-        next_page_token = None
+        nextPageToken = None
         while True:
-            url = f"https://www.googleapis.com/youtube/v3/commentThreads?part=snippet&videoId={video_id}&key={YOUTUBE_API_KEY}&maxResults=100"
-            if next_page_token:
-                url += f"&pageToken={next_page_token}"
-            
-            async with session.get(url) as response:
-                data = await response.json()
-                for item in data['items']:
-                    comment = item['snippet']['topLevelComment']['snippet']
-                    comments.append({
-                        'author': comment['authorDisplayName'],
-                        'text': comment['textDisplay'],
-                        'likes': comment['likeCount'],
-                        'published_at': comment['publishedAt']
-                    })
-                
-                next_page_token = data.get('nextPageToken')
-                if not next_page_token:
-                    break
-        
+            response = youtube.commentThreads().list(
+                part='snippet',
+                videoId=video_id,
+                maxResults=100,
+                pageToken=nextPageToken,
+                order='time'
+            ).execute()
+
+            for item in response['items']:
+                comment = item['snippet']['topLevelComment']['snippet']
+                comments.append({
+                    'author': comment['authorDisplayName'],
+                    'text': comment['textDisplay'],
+                    'likes': comment['likeCount'],
+                    'published_at': comment['publishedAt']
+                })
+
+            nextPageToken = response.get('nextPageToken')
+            if not nextPageToken:
+                break
+
         return comments
+    except Exception as e:
+        return f"An error occurred while fetching comments: {str(e)}"
 
 @st.cache_data(ttl=3600)
 def get_video_transcript_with_timestamps(video_id: str) -> List[Dict]:
@@ -288,7 +288,7 @@ Please format the response as follows:
 
     try:
         response = await openai.ChatCompletion.acreate(
-            model="gpt-3.5-turbo",
+            model="gpt-4o-mini",
             messages=[
                 {"role": "system", "content": "You are a helpful assistant that organizes video transcripts without altering their content."},
                 {"role": "user", "content": prompt}
@@ -310,29 +310,34 @@ async def process_full_transcript(transcript: List[Dict], video_id: str) -> str:
     return "\n\n".join(processed_chunks)
 
 async def generate_blog_post(processed_transcript: str, video_info: Dict) -> str:
-    prompt = f"""Create a concise blog post based on the following YouTube video transcript and information:
+    prompt = f"""Based on the following processed transcript and video information, create a comprehensive blog post. The blog post should include:
 
-Title: {video_info['title']}
-Description: {video_info['description']}
+1. Title
+2. Introduction
+3. Main content with subheadings (including timestamps)
+4. Key moments
+5. Conclusion
+6. Product links (if any mentioned in the video)
+7. Affiliate information (if provided)
+8. Camera and audio equipment used (if mentioned)
 
-Transcript: {processed_transcript[:2000]}...
+Video Title: {video_info['title']}
+Video Description: {video_info['description']}
 
-Include:
-1. Brief introduction
-2. 3-5 key points
-3. Short conclusion
+Processed Transcript:
+{processed_transcript}
 
-Format the blog post in HTML, using appropriate tags for headings and paragraphs.
+Please format the blog post accordingly, ensuring all relevant information from the video description is included. Include product links within the main content where relevant.
 """
 
     try:
         response = await openai.ChatCompletion.acreate(
-            model="gpt-3.5-turbo",
+            model="gpt-4o-mini",
             messages=[
-                {"role": "system", "content": "You are a skilled content writer who creates engaging and informative blog posts from YouTube video transcripts."},
+                {"role": "system", "content": "You are a helpful assistant that creates detailed blog posts from video transcripts and information."},
                 {"role": "user", "content": prompt}
             ],
-            max_tokens=1000
+            max_tokens=3500
         )
         return response.choices[0].message.content
     except Exception as e:
@@ -345,18 +350,28 @@ def make_links_clickable(text: str) -> str:
     return re.sub(r'(https?://\S+)', r'<a href="\1" target="_blank">\1</a>', text)
 
 def format_blog_post(blog_post: str, video_info: Dict) -> str:
-    formatted_post = f"""
-    <div class='blog-container'>
-        <h1 class='blog-title'>{video_info['title']}</h1>
-        <div class='blog-meta'>Published on {video_info['published_at']} | {video_info['view_count']} views | {video_info['like_count']} likes</div>
-        <div class='center-content'>
-            <img src="{video_info['thumbnail_url']}" alt="{video_info['title']}" class="blog-image" style="max-width: 100%; height: auto;"/>
-        </div>
-        <div class='blog-content'>
-            {blog_post}
-        </div>
-    </div>
-    """
+    lines = blog_post.split('\n')
+    formatted_post = f"<h1 class='blog-title'>{video_info['title']}</h1>"
+    formatted_post += f"<div class='blog-meta'>Published on {video_info['published_at']} | {video_info['view_count']} views | {video_info['like_count']} likes</div>"
+    formatted_post += get_image_html(video_info['thumbnail_url'], video_info['title'])
+    
+    for line in lines:
+        if line.startswith('Title:'):
+            continue  # Skip the title as we've already added it
+        elif line.lower().startswith(('introduction', 'conclusion')):
+            formatted_post += f"<h2>{line}</h2>"
+        elif line.startswith(('###', '##')):
+            formatted_post += f"<h3>{line.strip('#').strip()}</h3>"
+        elif re.match(r'\d{2}:\d{2}:\d{2}', line):  # Check for timestamp
+            timestamp = sum(int(x) * 60 ** i for i, x in enumerate(reversed(line.split(':')[:3])))
+            thumbnail_url = f"https://img.youtube.com/vi/{video_info['id']}/{int(timestamp/10)}.jpg"
+            formatted_post += f'<img src="{thumbnail_url}" alt="Video thumbnail at {line}" style="width: 320px; height: 180px; object-fit: cover;">'
+            formatted_post += f"<p>{make_links_clickable(line)}</p>"
+        elif line.strip() == '':
+            formatted_post += "<br>"
+        else:
+            formatted_post += f"<p>{make_links_clickable(line)}</p>"
+    
     return formatted_post
 
 async def main():
@@ -368,42 +383,41 @@ async def main():
         process_button = st.button("Generate")
 
     if process_button and video_id:
-        with st.spinner("Generating blog post, please wait..."):
+        with st.spinner("It's take few Seconds Please Wait..."):
             start_time = time.time()
             
-            try:
-                # Concurrent fetching of video info, transcript, and comments
-                video_info_task = asyncio.create_task(get_video_info(video_id))
-                transcript_task = asyncio.create_task(asyncio.to_thread(get_video_transcript_with_timestamps, video_id))
-                comments_task = asyncio.create_task(get_all_comments(video_id))
+            # Concurrent fetching of video info, transcript, and comments
+            video_info_task = asyncio.create_task(asyncio.to_thread(get_video_info, video_id))
+            transcript_task = asyncio.create_task(asyncio.to_thread(get_video_transcript_with_timestamps, video_id))
+            comments_task = asyncio.create_task(asyncio.to_thread(get_all_comments, video_id))
+            
+            video_info, transcript, comments = await asyncio.gather(video_info_task, transcript_task, comments_task)
+            
+            if isinstance(video_info, dict) and isinstance(transcript, list) and isinstance(comments, list):
+                processed_transcript = await process_full_transcript(transcript, video_id)
+                blog_post = await generate_blog_post(processed_transcript, video_info)
+                formatted_blog_post = format_blog_post(blog_post, video_info)
                 
-                video_info, transcript, comments = await asyncio.gather(video_info_task, transcript_task, comments_task)
+                st.markdown("<div class='blog-container'>", unsafe_allow_html=True)
+                st.markdown(formatted_blog_post, unsafe_allow_html=True)
+                st.markdown("</div>", unsafe_allow_html=True)
                 
-                if isinstance(video_info, dict) and isinstance(transcript, list) and isinstance(comments, list):
-                    processed_transcript = await process_full_transcript(transcript, video_id)
-                    blog_post = await generate_blog_post(processed_transcript, video_info)
-                    formatted_blog_post = format_blog_post(blog_post, video_info)
-                    
-                    st.markdown(formatted_blog_post, unsafe_allow_html=True)
-                    
-                    st.subheader("Top Comments")
-                    for comment in comments[:5]:  # Limit to 5 comments for performance
-                        st.markdown(f"""
-                        <div class="comment">
-                            <strong>{comment['author']}</strong> - {comment['published_at']}
-                            <p>{comment['text']}</p>
-                            <small>👍 {comment['likes']}</small>
-                        </div>
-                        """, unsafe_allow_html=True)
-                    
-                    end_time = time.time()
-                    st.success(f"Blog post generated in {end_time - start_time:.2f} seconds")
-                else:
-                    st.error("Failed to fetch video information, transcript, or comments.")
-            except Exception as e:
-                st.error(f"An error occurred: {str(e)}")
+                st.subheader("Comments")
+                for comment in comments[:10]:  # Limit to 10 comments for performance
+                    st.markdown(f"""
+                    <div class="comment">
+                        <strong>{comment['author']}</strong> - {comment['published_at']}
+                        <p>{comment['text']}</p>
+                        <small>👍 {comment['likes']}</small>
+                    </div>
+                    """, unsafe_allow_html=True)
+                
+                end_time = time.time()
+                st.success(f"Blog post generated in {end_time - start_time:.2f} seconds")
+            else:
+                st.error("Failed to fetch video information, transcript, or comments.")
     else:
-        st.info("Enter a YouTube Video ID and click 'Generate' to start.")
+        st.info("Enter a YouTube Video ID and click 'Generate Blog Post' to start.")
 
 if __name__ == "__main__":
     asyncio.run(main())
