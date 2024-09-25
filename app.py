@@ -300,79 +300,94 @@ st.set_page_config(layout="wide")
 import streamlit as st
 
 # Define the CSS as a string
+import streamlit as st
+
+# Define the CSS as a string
 css = """
 <style>
-    @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;700&family=Playfair+Display:wght@700&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Lora:wght@400;700&family=Open+Sans:wght@400;600&display=swap');
     
+    .blog-container {
+        max-width: 800px;
+        margin: 0 auto;
+        padding: 20px;
+        background-color: #ffffff;
+        box-shadow: 0 0 20px rgba(0,0,0,0.1);
+        border-radius: 10px;
+    }
     .blog-post {
-        font-family: 'Roboto', sans-serif;
-        line-height: 1.6;
+        font-family: 'Open Sans', sans-serif;
+        line-height: 1.8;
         color: #333;
     }
     .blog-post h1 {
-        font-family: 'Playfair Display', serif;
+        font-family: 'Lora', serif;
         font-size: 2.5em;
         color: #2c3e50;
-        border-bottom: 2px solid #3498db;
-        padding-bottom: 10px;
+        text-align: center;
+        margin-bottom: 20px;
     }
     .blog-post h2 {
-        font-family: 'Playfair Display', serif;
-        font-size: 2em;
+        font-family: 'Lora', serif;
+        font-size: 1.8em;
         color: #34495e;
-        border-left: 4px solid #3498db;
-        padding-left: 10px;
-        margin-top: 1.5em;
+        border-bottom: 2px solid #3498db;
+        padding-bottom: 10px;
+        margin-top: 30px;
     }
     .blog-post h3 {
-        font-family: 'Playfair Display', serif;
+        font-family: 'Lora', serif;
         font-size: 1.5em;
         color: #34495e;
     }
     .blog-meta {
         font-size: 0.9em;
         color: #7f8c8d;
-        font-style: italic;
-        margin-bottom: 1em;
+        text-align: center;
+        margin-bottom: 20px;
     }
     .blog-image {
         max-width: 100%;
         height: auto;
-        border-radius: 8px;
-        margin: 1em 0;
+        border-radius: 10px;
+        margin: 20px 0;
+        box-shadow: 0 0 10px rgba(0,0,0,0.1);
     }
     .product-box {
         background-color: #e8f4fc;
         border: 1px solid #3498db;
         border-radius: 5px;
-        padding: 10px;
-        margin: 10px 0;
+        padding: 15px;
+        margin: 20px 0;
     }
     .product-name {
-        font-weight: bold;
+        font-weight: 600;
         color: #2c3e50;
+        font-size: 1.1em;
     }
     .product-url {
         word-break: break-all;
+        margin-top: 5px;
     }
     .timestamp {
-        font-weight: bold;
+        font-weight: 600;
         color: #e74c3c;
     }
     .key-moment {
         background-color: #fdf2e9;
         border-left: 4px solid #e67e22;
-        padding: 10px;
-        margin: 10px 0;
+        padding: 15px;
+        margin: 20px 0;
     }
     .comment {
         background-color: #f9f9f9;
         border-left: 4px solid #3498db;
-        padding: 10px;
-        margin-bottom: 10px;
+        padding: 15px;
+        margin-bottom: 15px;
+        border-radius: 5px;
     }
     .comment-author {
-        font-weight: bold;
+        font-weight: 600;
         color: #2c3e50;
     }
     .comment-date {
@@ -382,6 +397,17 @@ css = """
     .comment-likes {
         font-size: 0.9em;
         color: #3498db;
+        margin-top: 5px;
+    }
+    .blog-content p {
+        margin-bottom: 20px;
+    }
+    blockquote {
+        border-left: 5px solid #3498db;
+        padding-left: 20px;
+        margin: 20px 0;
+        font-style: italic;
+        color: #34495e;
     }
 </style>
 """
@@ -430,13 +456,15 @@ if st.button("Process Transcript and Generate Blog Post"):
 # Updated format_blog_post function
 def format_blog_post(blog_post: str, video_info: Dict) -> str:
     formatted_post = f"""
-    <div class="blog-post">
-        <h1>{video_info['title']}</h1>
-        <div class="blog-meta">Published on {video_info['published_at']} | {video_info['view_count']} views | {video_info['like_count']} likes</div>
-        <img src="{video_info['thumbnail_url']}" alt="{video_info['title']}" class="blog-image"/>
-        
-        <div class="blog-content">
-            {blog_post}
+    <div class="blog-container">
+        <div class="blog-post">
+            <h1>{video_info['title']}</h1>
+            <div class="blog-meta">Published on {video_info['published_at']} | {video_info['view_count']} views | {video_info['like_count']} likes</div>
+            <img src="{video_info['thumbnail_url']}" alt="{video_info['title']}" class="blog-image"/>
+            
+            <div class="blog-content">
+                {blog_post}
+            </div>
         </div>
     </div>
     """
@@ -448,24 +476,26 @@ def generate_blog_post(processed_transcript: str, video_info: Dict) -> str:
     # This is a placeholder. You'll need to implement the actual logic to generate the blog post
     blog_post = f"""
         <h2>Introduction</h2>
-        <p>This is the introduction to the video.</p>
+        <p>Welcome to this exciting blog post about {video_info['title']}. In this article, we'll dive deep into the content of this video and explore its key points.</p>
+
+        <blockquote>"{video_info['description'][:100]}..."</blockquote>
 
         <h2>Main Content</h2>
-        <p>This is the main content of the video.</p>
+        <p>This is where you would put the main content of your blog post, based on the processed transcript.</p>
 
         <h2>Key Moments</h2>
         <div class="key-moment">
             <span class="timestamp">00:05:23</span>
-            <p>This is a key moment in the video.</p>
+            <p>This is a key moment in the video. You would replace this with actual key moments from the transcript.</p>
         </div>
 
         <h2>Products Mentioned</h2>
         <div class="product-box">
-            <div class="product-name">Product Name</div>
-            <div class="product-url"><a href="#" target="_blank">Product URL</a></div>
+            <div class="product-name">Example Product</div>
+            <div class="product-url"><a href="#" target="_blank">https://example.com/product</a></div>
         </div>
 
         <h2>Conclusion</h2>
-        <p>This is the conclusion of the video.</p>
+        <p>To wrap up, we've explored the main points of {video_info['title']}. We hope you found this blog post informative and engaging.</p>
     """
     return blog_post
