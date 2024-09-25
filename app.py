@@ -381,10 +381,10 @@ async def main():
     col1, col2, col3 = st.columns([1,2,1])
     with col2:
         video_id = st.text_input("Enter YouTube Video ID")
-        process_button = st.button("Generate Blog Post")
+        process_button = st.button("Generate")
 
     if process_button and video_id:
-        with st.spinner("Processing video and generating blog post..."):
+        with st.spinner("It's take few Seconds Please Wait..."):
             start_time = time.time()
             
             # Concurrent fetching of video info, transcript, and comments
