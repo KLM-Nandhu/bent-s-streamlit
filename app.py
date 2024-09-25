@@ -297,11 +297,8 @@ def format_blog_post(blog_post: str, video_info: Dict) -> str:
 
 st.set_page_config(layout="wide")
 
-# ... [previous code remains the same] ...
-
-st.markdown("""
 <style>
-    @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;700&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;700&family=Playfair+Display:wght@700&display=swap');
     
     body {
         color: #333;
@@ -339,6 +336,7 @@ st.markdown("""
         margin-top: 2rem;
     }
     .blog-post h1 {
+        font-family: 'Playfair Display', serif;
         font-size: 2.8em;
         color: #2c3e50;
         margin-bottom: 0.5em;
@@ -347,6 +345,7 @@ st.markdown("""
         font-weight: 700;
     }
     .blog-post h2 {
+        font-family: 'Playfair Display', serif;
         font-size: 2.2em;
         color: #34495e;
         margin-top: 1.2em;
@@ -356,6 +355,7 @@ st.markdown("""
         padding-left: 10px;
     }
     .blog-post h3 {
+        font-family: 'Playfair Display', serif;
         font-size: 1.8em;
         color: #34495e;
         margin-top: 1em;
@@ -372,6 +372,7 @@ st.markdown("""
         font-size: 0.9em;
         color: #7f8c8d;
         margin-bottom: 1em;
+        font-style: italic;
     }
     .blog-content {
         background-color: #fff;
@@ -425,54 +426,77 @@ st.markdown("""
     a {
         color: #3498db;
         text-decoration: none;
+        transition: color 0.3s;
     }
     a:hover {
+        color: #2980b9;
         text-decoration: underline;
     }
+    .product-box {
+        background-color: #e8f4fc;
+        border: 1px solid #3498db;
+        border-radius: 5px;
+        padding: 10px;
+        margin: 10px 0;
+    }
+    .product-name {
+        font-weight: bold;
+        color: #2c3e50;
+        font-size: 1.1em;
+    }
+    .product-url {
+        word-break: break-all;
+    }
+    .timestamp {
+        font-weight: bold;
+        color: #e74c3c;
+    }
+    .key-moment {
+        background-color: #fdf2e9;
+        border-left: 4px solid #e67e22;
+        padding: 10px;
+        margin: 10px 0;
+    }
 </style>
-""", unsafe_allow_html=True)
 
-st.title("BENT-S-BLOG")
+<!-- Example of improved HTML structure -->
+<div class="blog-post">
+    <h1>{video_info['title']}</h1>
+    <div class="blog-meta">Published on {video_info['published_at']} | {video_info['view_count']} views | {video_info['like_count']} likes</div>
+    <img src="{video_info['thumbnail_url']}" alt="{video_info['title']}" class="blog-image"/>
+    
+    <div class="blog-content">
+        <h2>Introduction</h2>
+        <p>{introduction_content}</p>
+        
+        <h2>Main Content</h2>
+        {main_content_sections}
+        
+        <h2>Key Moments</h2>
+        <div class="key-moment">
+            <span class="timestamp">00:05:23</span>
+            <p>{key_moment_content}</p>
+        </div>
+        
+        <h2>Products Mentioned</h2>
+        <div class="product-box">
+            <div class="product-name">{product_name}</div>
+            <div class="product-url"><a href="{product_url}" target="_blank">{product_url}</a></div>
+        </div>
+        
+        <h2>Conclusion</h2>
+        <p>{conclusion_content}</p>
+    </div>
+</div>
 
-video_id = st.text_input("Enter YouTube Video ID")
-
-if st.button("Process Transcript and Generate Blog Post"):
-    if video_id:
-        with st.spinner("Processing transcript and generating blog post..."):
-            video_info = get_video_info(video_id)
-            if isinstance(video_info, dict):
-                transcript = get_video_transcript_with_timestamps(video_id)
-                comments = get_all_comments(video_id)
-                if isinstance(transcript, list) and isinstance(comments, list):
-                    processed_transcript = asyncio.run(process_full_transcript(transcript, video_id))
-                    blog_post = asyncio.run(generate_blog_post(processed_transcript, video_info))
-                    formatted_blog_post = format_blog_post(blog_post, video_info)
-                    
-                    # Display the blog post content
-                    st.markdown("<div class='blog-post'>", unsafe_allow_html=True)
-                    st.markdown("<div class='blog-content'>", unsafe_allow_html=True)
-                    st.markdown(formatted_blog_post, unsafe_allow_html=True)
-                    st.markdown("</div>", unsafe_allow_html=True)
-                    st.markdown("</div>", unsafe_allow_html=True)
-                    
-                    # Display comments in a separate container with internal scrolling
-                    st.markdown("<div class='comments-container'>", unsafe_allow_html=True)
-                    st.markdown("<h2>Comments</h2>", unsafe_allow_html=True)
-                    st.markdown("<div class='comments-scrollable'>", unsafe_allow_html=True)
-                    for comment in comments:
-                        st.markdown(f"""
+<div class="comments-container">
+    <h2>Comments</h2>
+    <div class="comments-scrollable">
         <div class="comment">
             <div class="comment-author">{comment['author']}</div>
             <div class="comment-date">{comment['published_at']}</div>
             <div class="comment-text">{comment['text']}</div>
             <div class="comment-likes">👍 {comment['likes']}</div>
         </div>
-        """, unsafe_allow_html=True)
-                    st.markdown("</div>", unsafe_allow_html=True)
-                    st.markdown("</div>", unsafe_allow_html=True)
-                else:
-                    st.error(transcript if isinstance(transcript, str) else comments)
-            else:
-                st.error(video_info)
-    else:
-         st.error("Please enter a YouTube Video ID.")
+    </div>
+</div>
