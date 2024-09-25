@@ -463,31 +463,57 @@ if st.button("Click To Generate"):
                     st.markdown(formatted_blog_post, unsafe_allow_html=True)
                     st.markdown("</div>", unsafe_allow_html=True)
                     
-                    # Display comments
-                    st.markdown("<div class='comments-container'>", unsafe_allow_html=True)
-                    st.markdown("<h2>Comments</h2>", unsafe_allow_html=True)
-                    st.markdown("<div class='comments-scrollable'>", unsafe_allow_html=True)
-                    for comment in comments:
-                        st.markdown(f"""
-                        <div class="comment">
-                            <div class="comment-author">{comment['author']}</div>
-                            <div class="comment-date">{comment['published_at']}</div>
-                            <div class="comment-text">{comment['text']}</div>
-                            <div class="comment-likes">:+1: {comment['likes']}</div>
-                        </div>
-                        """, unsafe_allow_html=True)
-                    st.markdown("</div>", unsafe_allow_html=True)
-                    st.markdown("</div>", unsafe_allow_html=True)
-                    
-                    # Display total time taken
-                    end_time = time.time()
-                    total_time = end_time - start_time
-                    st.markdown(f"<div class='total-time'>Total time taken: {total_time:.2f} seconds</div>", unsafe_allow_html=True)
-                    
-                    st.markdown("</div>", unsafe_allow_html=True)
-                else:
-                    st.error(transcript if isinstance(transcript, str) else comments)
-            else:
-                st.error(video_info)
-    else:
-        st.error("Please enter a YouTube Video ID.")
+                
+st.markdown("""
+    <style>
+    .comment-container {
+        max-height: 500px;
+        overflow-y: scroll;
+        padding: 10px;
+        border: 1px solid #ccc;
+        background-color: #f9f9f9;
+    }
+    .comment {
+        margin-bottom: 15px;
+        padding: 10px;
+        border-bottom: 1px solid #eee;
+    }
+    .comment-author {
+        font-weight: bold;
+        margin-bottom: 5px;
+    }
+    .comment-date {
+        font-size: 0.9em;
+        color: #888;
+    }
+    .comment-text {
+        margin: 10px 0;
+    }
+    .comment-likes {
+        color: #007BFF;
+        font-size: 0.9em;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+
+# Container for comments
+st.markdown("<div class='comment-container'>", unsafe_allow_html=True)
+
+# Loop to display comments
+for comment in comments:
+    st.markdown(f"""
+    <div class="comment">
+        <div class="comment-author">{comment['author']}</div>
+        <div class="comment-date">{comment['published_at']}</div>
+        <div class="comment-text">{comment['text']}</div>
+        <div class="comment-likes">:+1: {comment['likes']}</div>
+    </div>
+    """, unsafe_allow_html=True)
+
+# Close the comment container
+st.markdown("</div>", unsafe_allow_html=True)
+
+# Display total time taken
+end_time = time.time()
+total_time = end_time - start_time
+st.markdown(f"<div class='total-time'>Total time taken: {total_time:.2f} seconds</div>", unsafe_allow_html=True)
