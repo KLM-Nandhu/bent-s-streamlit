@@ -307,7 +307,6 @@ st.set_page_config(layout="wide")
         background-color: #f0f2f5;
     }
     .main {
-        max-width: 800px;
         margin: 0 auto;
         background-color: white;
         padding: 2rem;
