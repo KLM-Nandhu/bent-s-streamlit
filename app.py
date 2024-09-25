@@ -195,7 +195,7 @@ Starting timestamp:
 Ending Timestamp:
 Transcript:
 
-The goal is to not summarize or alter any information, but just reorganize the existing transcript into this structure. Use the provided timestamps to determine the start and end times for each section.
+The goal is to not summarize or alter any information, but just reorganize the existing transcript into this structure.GIVE 5 TO 8 lines for individual timestamp. Use the provided timestamps to determine the start and end times for each section.
 
 Here's the transcript chunk:
 {chunk}
@@ -235,7 +235,7 @@ async def generate_blog_post(processed_transcript: str, video_info: Dict) -> str
 
 1. Title
 2. Introduction
-3. Main content with subheadings (including timestamps)
+3. Main content with subheadings (including timestamps with 5 to 8 lines in a content)
 4. Key moments
 5. Conclusion
 6. Product links (if any mentioned in the video)
@@ -255,7 +255,7 @@ Please format the blog post accordingly, ensuring all relevant information from 
         response = await openai.ChatCompletion.acreate(
             model="gpt-4o-mini",
             messages=[
-                {"role": "system", "content": "You are a helpful assistant that creates detailed blog posts from video transcripts and information."},
+                {"role": "system", "content": "You are a helpful assistant that creates detailed blog posts from video transcripts and information.make the thumbnail image into center.make a quick responce.make a quick responce. if it take above 20 seconds give some extra warning message for please wait.and finally give the total time taken for the total responds."},
                 {"role": "user", "content": prompt}
             ],
             max_tokens=3500
@@ -296,9 +296,6 @@ def format_blog_post(blog_post: str, video_info: Dict) -> str:
     return formatted_post
 
 st.set_page_config(layout="wide")
-
-
-
 st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;700&display=swap');
