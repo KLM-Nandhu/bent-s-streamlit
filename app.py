@@ -1,5 +1,4 @@
 import streamlit as st
-from youtube_transcript_api import YouTubeTranscriptApi
 import openai
 from typing import List, Dict
 import asyncio
@@ -9,6 +8,13 @@ from datetime import datetime
 import base64
 from googleapiclient.discovery import build
 import re
+import random
+import time
+from selenium import webdriver
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+from bs4 import BeautifulSoup
 
 # Set your API keys here
 openai.api_key = st.secrets["OPENAI_API_KEY"]
@@ -68,33 +74,112 @@ def get_all_comments(video_id: str) -> List[Dict]:
         return f"An error occurred while fetching comments: {str(e)}"
 
 def get_video_transcript_with_timestamps(video_id: str) -> List[Dict]:
-    try:
-        # List of free proxy servers (you should rotate these and find reliable ones)
-        proxies = [
-            'http://203.30.189.42:80',
-            'http://203.30.191.42:80',
-            'http://203.30.190.42:80',
-            # Add more proxy servers here
-        ]
-        
-        for proxy in proxies:
-            try:
-                # Set up the proxy
-                proxy_dict = {
-                    'http': proxy,
-                    'https': proxy,
-                }
-                
-                # Create a custom YouTubeTranscriptApi with the proxy
-                transcript = YouTubeTranscriptApi.get_transcript(video_id, proxies=proxy_dict)
+    methods = [
+        fetch_transcript_directly,
+        fetch_transcript_with_rotating_proxy,
+        fetch_transcript_with_selenium,
+        fetch_transcript_from_third_party,
+        fetch_transcript_with_custom_headers
+    ]
+    
+    random.shuffle(methods)  # Randomize the order of methods
+    
+    for method in methods:
+        try:
+            transcript = method(video_id)
+            if transcript:
                 return transcript
-            except Exception as e:
-                print(f"Proxy {proxy} failed: {str(e)}")
-                continue
+        except Exception as e:
+            print(f"Method {method.__name__} failed: {str(e)}")
+        time.sleep(random.uniform(1, 3))  # Add random delay between attempts
+    
+    return f"An error occurred while fetching the transcript: All methods failed"
+
+def fetch_transcript_directly(video_id: str) -> List[Dict]:
+    from youtube_transcript_api import YouTubeTranscriptApi
+    return YouTubeTranscriptApi.get_transcript(video_id)
+
+def fetch_transcript_with_rotating_proxy(video_id: str) -> List[Dict]:
+    from youtube_transcript_api import YouTubeTranscriptApi
+    proxy_api_url = "https://api.proxyscrape.com/v2/?request=getproxies&protocol=http&timeout=10000&country=all&ssl=all&anonymity=all"
+    response = requests.get(proxy_api_url)
+    proxies = response.text.strip().split('\r\n')
+    
+    for proxy in proxies:
+        try:
+            proxy_dict = {
+                'http': f'http://{proxy}',
+                'https': f'http://{proxy}',
+            }
+            return YouTubeTranscriptApi.get_transcript(video_id, proxies=proxy_dict)
+        except Exception as e:
+            print(f"Proxy {proxy} failed: {str(e)}")
+    
+    raise Exception("All proxies failed")
+
+def fetch_transcript_with_selenium(video_id: str) -> List[Dict]:
+    options = webdriver.ChromeOptions()
+    options.add_argument('--headless')
+    driver = webdriver.Chrome(options=options)
+    
+    try:
+        driver.get(f"https://www.youtube.com/watch?v={video_id}")
         
-        raise Exception("All proxies failed")
+        # Wait for and click the "Show Transcript" button
+        transcript_button = WebDriverWait(driver, 10).until(
+            EC.presence_of_element_located((By.CSS_SELECTOR, "button[aria-label='Show transcript']"))
+        )
+        transcript_button.click()
+        
+        # Wait for the transcript to load
+        WebDriverWait(driver, 10).until(
+            EC.presence_of_element_located((By.CSS_SELECTOR, "div[id='segments-container']"))
+        )
+        
+        # Extract transcript
+        transcript_elements = driver.find_elements(By.CSS_SELECTOR, "div[id='segments-container'] div.segment")
+        transcript = []
+        for element in transcript_elements:
+            time_element = element.find_element(By.CSS_SELECTOR, "div.segment-timestamp")
+            text_element = element.find_element(By.CSS_SELECTOR, "div.segment-text")
+            transcript.append({
+                "text": text_element.text,
+                "start": time_element.text,
+                "duration": 0  # We don't have duration information in this method
+            })
+        
+        return transcript
+    finally:
+        driver.quit()
+
+def fetch_transcript_from_third_party(video_id: str) -> List[Dict]:
+    # This is a placeholder for a hypothetical third-party service
+    # You would need to replace this with an actual API call to a service that provides YouTube transcripts
+    api_url = f"https://api.transcriptservice.com/v1/youtube/{video_id}"
+    response = requests.get(api_url)
+    if response.status_code == 200:
+        return response.json()
+    else:
+        raise Exception(f"Third-party API request failed with status code {response.status_code}")
+
+def fetch_transcript_with_custom_headers(video_id: str) -> List[Dict]:
+    from youtube_transcript_api import YouTubeTranscriptApi
+    headers = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+        'Accept-Language': 'en-US,en;q=0.9',
+        'Accept-Encoding': 'gzip, deflate, br',
+        'Connection': 'keep-alive',
+        'Upgrade-Insecure-Requests': '1',
+        'TE': 'Trailers',
+    }
+    
+    session = requests.Session()
+    session.headers.update(headers)
+    
+    try:
+        return YouTubeTranscriptApi.get_transcript(video_id, proxies=session.proxies, headers=session.headers)
     except Exception as e:
-        return f"An error occurred while fetching the transcript: {str(e)}"
+        raise Exception(f"Custom headers method failed: {str(e)}")
 
 def format_time(seconds: float) -> str:
     hours, remainder = divmod(int(seconds), 3600)
@@ -211,6 +296,8 @@ def format_blog_post(blog_post: str, video_info: Dict) -> str:
     return formatted_post
 
 st.set_page_config(layout="wide")
+
+# ... [previous code remains the same] ...
 
 st.markdown("""
 <style>
@@ -361,7 +448,7 @@ if st.button("Process Transcript and Generate Blog Post"):
                     blog_post = asyncio.run(generate_blog_post(processed_transcript, video_info))
                     formatted_blog_post = format_blog_post(blog_post, video_info)
                     
-                     # Display the blog post content
+                    # Display the blog post content
                     st.markdown("<div class='blog-post'>", unsafe_allow_html=True)
                     st.markdown("<div class='blog-content'>", unsafe_allow_html=True)
                     st.markdown(formatted_blog_post, unsafe_allow_html=True)
