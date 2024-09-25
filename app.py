@@ -297,138 +297,49 @@ def format_blog_post(blog_post: str, video_info: Dict) -> str:
 
 st.set_page_config(layout="wide")
 
+import streamlit as st
+
+# Define the CSS as a string
+css = """
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;700&family=Playfair+Display:wght@700&display=swap');
     
-    body {
-        color: #333;
+    .blog-post {
         font-family: 'Roboto', sans-serif;
         line-height: 1.6;
-        background-color: #f0f2f5;
-    }
-    .main {
-        margin: 0 auto;
-        background-color: white;
-        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-        border-radius: 8px;
-    }
-    .stButton>button {
-        width: 100%;
-        background-color: #4CAF50;
-        color: white;
-        border: none;
-        padding: 12px 20px;
-        text-align: center;
-        text-decoration: none;
-        display: inline-block;
-        font-size: 18px;
-        margin: 4px 2px;
-        cursor: pointer;
-        border-radius: 5px;
-        transition: background-color 0.3s;
-    }
-    .stButton>button:hover {
-        background-color: #45a049;
-    }
-    .blog-post {
-        margin-top: 2rem;
+        color: #333;
     }
     .blog-post h1 {
         font-family: 'Playfair Display', serif;
-        font-size: 2.8em;
+        font-size: 2.5em;
         color: #2c3e50;
-        margin-bottom: 0.5em;
         border-bottom: 2px solid #3498db;
         padding-bottom: 10px;
-        font-weight: 700;
     }
     .blog-post h2 {
         font-family: 'Playfair Display', serif;
-        font-size: 2.2em;
+        font-size: 2em;
         color: #34495e;
-        margin-top: 1.2em;
-        margin-bottom: 0.5em;
-        font-weight: 700;
         border-left: 4px solid #3498db;
         padding-left: 10px;
+        margin-top: 1.5em;
     }
     .blog-post h3 {
         font-family: 'Playfair Display', serif;
-        font-size: 1.8em;
+        font-size: 1.5em;
         color: #34495e;
-        margin-top: 1em;
-        margin-bottom: 0.5em;
-        font-weight: 600;
-    }
-    .blog-post p {
-        margin-bottom: 1em;
-        text-align: justify;
-        font-size: 1.1em;
-        line-height: 1.8;
     }
     .blog-meta {
         font-size: 0.9em;
         color: #7f8c8d;
-        margin-bottom: 1em;
         font-style: italic;
-    }
-    .blog-content {
-        background-color: #fff;
-        padding: 20px;
-        border-radius: 8px;
-        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        margin-bottom: 1em;
     }
     .blog-image {
         max-width: 100%;
         height: auto;
+        border-radius: 8px;
         margin: 1em 0;
-        border-radius: 8px;
-        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-    }
-    .comments-container {
-        max-width: 800px;
-        margin: 2rem auto;
-        border: 1px solid #e0e0e0;
-        border-radius: 8px;
-        padding: 20px;
-        background-color: #f9f9f9;
-    }
-    .comments-scrollable {
-        max-height: 500px;
-        overflow-y: auto;
-    }
-    .comment {
-        background-color: #ffffff;
-        border-left: 4px solid #3498db;
-        padding: 15px;
-        margin-bottom: 15px;
-        border-radius: 4px;
-        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-    }
-    .comment-author {
-        font-weight: bold;
-        color: #2c3e50;
-    }
-    .comment-date {
-        font-size: 0.8em;
-        color: #7f8c8d;
-    }
-    .comment-text {
-        margin-top: 5px;
-    }
-    .comment-likes {
-        font-size: 0.9em;
-        color: #3498db;
-        margin-top: 5px;
-    }
-    a {
-        color: #3498db;
-        text-decoration: none;
-        transition: color 0.3s;
-    }
-    a:hover {
-        color: #2980b9;
-        text-decoration: underline;
     }
     .product-box {
         background-color: #e8f4fc;
@@ -440,7 +351,6 @@ st.set_page_config(layout="wide")
     .product-name {
         font-weight: bold;
         color: #2c3e50;
-        font-size: 1.1em;
     }
     .product-url {
         word-break: break-all;
@@ -455,46 +365,107 @@ st.set_page_config(layout="wide")
         padding: 10px;
         margin: 10px 0;
     }
+    .comment {
+        background-color: #f9f9f9;
+        border-left: 4px solid #3498db;
+        padding: 10px;
+        margin-bottom: 10px;
+    }
+    .comment-author {
+        font-weight: bold;
+        color: #2c3e50;
+    }
+    .comment-date {
+        font-size: 0.8em;
+        color: #7f8c8d;
+    }
+    .comment-likes {
+        font-size: 0.9em;
+        color: #3498db;
+    }
 </style>
+"""
 
-<!-- Example of improved HTML structure -->
-<div class="blog-post">
-    <h1>{video_info['title']}</h1>
-    <div class="blog-meta">Published on {video_info['published_at']} | {video_info['view_count']} views | {video_info['like_count']} likes</div>
-    <img src="{video_info['thumbnail_url']}" alt="{video_info['title']}" class="blog-image"/>
-    
-    <div class="blog-content">
+# Apply the CSS
+st.markdown(css, unsafe_allow_html=True)
+
+# Your existing Streamlit app code goes here
+st.title("BENT-S-BLOG")
+
+video_id = st.text_input("Enter YouTube Video ID")
+
+if st.button("Process Transcript and Generate Blog Post"):
+    if video_id:
+        with st.spinner("Processing transcript and generating blog post..."):
+            video_info = get_video_info(video_id)
+            if isinstance(video_info, dict):
+                transcript = get_video_transcript_with_timestamps(video_id)
+                comments = get_all_comments(video_id)
+                if isinstance(transcript, list) and isinstance(comments, list):
+                    processed_transcript = asyncio.run(process_full_transcript(transcript, video_id))
+                    blog_post = asyncio.run(generate_blog_post(processed_transcript, video_info))
+                    formatted_blog_post = format_blog_post(blog_post, video_info)
+                    
+                    # Display the blog post content
+                    st.markdown(formatted_blog_post, unsafe_allow_html=True)
+                    
+                    # Display comments
+                    st.markdown("<h2>Comments</h2>", unsafe_allow_html=True)
+                    for comment in comments:
+                        st.markdown(f"""
+                        <div class="comment">
+                            <div class="comment-author">{comment['author']}</div>
+                            <div class="comment-date">{comment['published_at']}</div>
+                            <div class="comment-text">{comment['text']}</div>
+                            <div class="comment-likes">👍 {comment['likes']}</div>
+                        </div>
+                        """, unsafe_allow_html=True)
+                else:
+                    st.error(transcript if isinstance(transcript, str) else comments)
+            else:
+                st.error(video_info)
+    else:
+        st.error("Please enter a YouTube Video ID.")
+
+# Updated format_blog_post function
+def format_blog_post(blog_post: str, video_info: Dict) -> str:
+    formatted_post = f"""
+    <div class="blog-post">
+        <h1>{video_info['title']}</h1>
+        <div class="blog-meta">Published on {video_info['published_at']} | {video_info['view_count']} views | {video_info['like_count']} likes</div>
+        <img src="{video_info['thumbnail_url']}" alt="{video_info['title']}" class="blog-image"/>
+        
+        <div class="blog-content">
+            {blog_post}
+        </div>
+    </div>
+    """
+    return formatted_post
+
+# You'll need to implement the logic in generate_blog_post to structure the content
+# Here's an example of how you might structure the blog post content:
+def generate_blog_post(processed_transcript: str, video_info: Dict) -> str:
+    # This is a placeholder. You'll need to implement the actual logic to generate the blog post
+    blog_post = f"""
         <h2>Introduction</h2>
-        <p>{introduction_content}</p>
-        
+        <p>This is the introduction to the video.</p>
+
         <h2>Main Content</h2>
-        {main_content_sections}
-        
+        <p>This is the main content of the video.</p>
+
         <h2>Key Moments</h2>
         <div class="key-moment">
             <span class="timestamp">00:05:23</span>
-            <p>{key_moment_content}</p>
+            <p>This is a key moment in the video.</p>
         </div>
-        
+
         <h2>Products Mentioned</h2>
         <div class="product-box">
-            <div class="product-name">{product_name}</div>
-            <div class="product-url"><a href="{product_url}" target="_blank">{product_url}</a></div>
+            <div class="product-name">Product Name</div>
+            <div class="product-url"><a href="#" target="_blank">Product URL</a></div>
         </div>
-        
-        <h2>Conclusion</h2>
-        <p>{conclusion_content}</p>
-    </div>
-</div>
 
-<div class="comments-container">
-    <h2>Comments</h2>
-    <div class="comments-scrollable">
-        <div class="comment">
-            <div class="comment-author">{comment['author']}</div>
-            <div class="comment-date">{comment['published_at']}</div>
-            <div class="comment-text">{comment['text']}</div>
-            <div class="comment-likes">👍 {comment['likes']}</div>
-        </div>
-    </div>
-</div>
+        <h2>Conclusion</h2>
+        <p>This is the conclusion of the video.</p>
+    """
+    return blog_post
