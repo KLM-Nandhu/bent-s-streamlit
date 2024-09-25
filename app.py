@@ -307,35 +307,33 @@ st.markdown("""
         background-color: #f0f2f5;
     }
     .main {
-        max-width: 1200px;
+        max-width: 800px;
         margin: 0 auto;
+        background-color: white;
         padding: 2rem;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        border-radius: 8px;
     }
     .stButton>button {
-        width: 30%;
-        background-color: #3498db;
+        width: 100%;
+        background-color: #4CAF50;
+        color: white;
         border: none;
         padding: 12px 20px;
         text-align: center;
         text-decoration: none;
         display: inline-block;
         font-size: 18px;
-        margin: 2px;
+        margin: 4px 2px;
         cursor: pointer;
-        border-radius: 2px;
-        transition: all 0.3s ease;
+        border-radius: 5px;
+        transition: background-color 0.3s;
     }
     .stButton>button:hover {
-        background-color: #2980b9;
-        transform: translateY(-2px);
-        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        background-color: #45a049;
     }
-    .content-container {
+    .blog-post {
         margin-top: 2rem;
-        background-color: white;
-        padding: 2rem;
-        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-        border-radius: 8px;
     }
     .blog-post h1 {
         font-size: 2.8em;
@@ -372,6 +370,12 @@ st.markdown("""
         color: #7f8c8d;
         margin-bottom: 1em;
     }
+    .blog-content {
+        background-color: #fff;
+        padding: 20px;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    }
     .blog-image {
         max-width: 100%;
         height: auto;
@@ -379,15 +383,9 @@ st.markdown("""
         border-radius: 8px;
         box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
     }
-    .timestamp-image {
-        width: 320px;
-        height: 180px;
-        object-fit: cover;
-        border-radius: 4px;
-        margin: 10px 0;
-    }
     .comments-container {
-        margin-top: 2rem;
+        max-width: 800px;
+        margin: 2rem auto;
         border: 1px solid #e0e0e0;
         border-radius: 8px;
         padding: 20px;
@@ -427,24 +425,6 @@ st.markdown("""
     }
     a:hover {
         text-decoration: underline;
-    }
-    .loading-spinner {
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        height: 100px;
-    }
-    .waiting-message {
-        text-align: center;
-        font-size: 1.2em;
-        color: #3498db;
-        margin-top: 20px;
-    }
-    .total-time {
-        text-align: right;
-        font-size: 0.9em;
-        color: #7f8c8d;
-        margin-top: 10px;
     }
 </style>
 """, unsafe_allow_html=True)
