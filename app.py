@@ -153,6 +153,7 @@ def fetch_transcript_with_selenium(video_id: str) -> List[Dict]:
         driver.quit()
 
 def fetch_transcript_from_third_party(video_id: str) -> List[Dict]:
+    # This is a placeholder for a hypothetical third-party service
     api_url = f"https://api.transcriptservice.com/v1/youtube/{video_id}"
     response = requests.get(api_url)
     if response.status_code == 200:
@@ -183,6 +184,10 @@ def format_time(seconds: float) -> str:
     hours, remainder = divmod(int(seconds), 3600)
     minutes, seconds = divmod(remainder, 60)
     return f"{hours:02d}:{minutes:02d}:{seconds:02d}"
+
+# Function to make text between * symbols bold
+def format_bold(text):
+    return re.sub(r'\*(.*?)\*', r'<strong>\1</strong>', text)
 
 async def process_transcript_chunk(chunk: str, video_id: str) -> str:
     prompt = f"""This is a portion of a video transcript. Please organize this content into the following structure:
@@ -383,6 +388,7 @@ st.markdown("""
     }
    .comment-container {
         max-height: 500px;
+        max-width: 500px;
         overflow-y: scroll;
         padding: 10px;
         border: 1px solid #ccc;
@@ -418,14 +424,6 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-import streamlit as st
-import time
-import openai
-from typing import List, Dict
-
-# Assuming the previous imports and functions are defined here
-# ...
-
 st.title("BENT-S-BLOG")
 
 video_id = st.text_input("Enter YouTube Video ID")
@@ -439,7 +437,6 @@ if st.button("Click To Generate"):
                 transcript = get_video_transcript_with_timestamps(video_id)
                 comments = get_all_comments(video_id)
 
-                # Check if comments are a valid list
                 if isinstance(transcript, list) and isinstance(comments, list):
                     processed_transcript = asyncio.run(process_full_transcript(transcript, video_id))
                     
@@ -462,17 +459,21 @@ if st.button("Click To Generate"):
                     st.markdown(formatted_blog_post, unsafe_allow_html=True)
                     st.markdown("</div>", unsafe_allow_html=True)
 
+                # Comments Section Heading
+                st.markdown("<h2>Comments</h2>", unsafe_allow_html=True)
+
                 # Container for comments
                 if isinstance(comments, list):
                     st.markdown("<div class='comment-container'>", unsafe_allow_html=True)
                     
                     # Loop to display comments
                     for comment in comments:
+                        formatted_text = format_bold(comment['text'])  # Format text to make *bold* text bold
                         st.markdown(f"""
                         <div class="comment">
                             <div class="comment-author">{comment['author']}</div>
                             <div class="comment-date">{comment['published_at']}</div>
-                            <div class="comment-text">{comment['text']}</div>
+                            <div class="comment-text">{formatted_text}</div>
                             <div class="comment-likes">:+1: {comment['likes']}</div>
                         </div>
                         """, unsafe_allow_html=True)
@@ -491,4 +492,3 @@ if st.button("Click To Generate"):
                 st.error(video_info)
     else:
         st.error("Please enter a YouTube Video ID.")
-
