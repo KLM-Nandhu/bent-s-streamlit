@@ -1,26 +1,26 @@
 import streamlit as st
+import openai
 from typing import List, Dict
 import asyncio
-import openai
-from googleapiclient.discovery import build
-from youtube_transcript_api import YouTubeTranscriptApi
-import re
-from html import unescape
+import requests
+from io import BytesIO
 from datetime import datetime
+import base64
+from googleapiclient.discovery import build
+import re
+import random
+import time
+from selenium import webdriver
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+from bs4 import BeautifulSoup
 
 # Set your API keys here
 openai.api_key = st.secrets["OPENAI_API_KEY"]
 YOUTUBE_API_KEY = st.secrets["YOUTUBE_API_KEY"]
 
-# YouTube API setup
 youtube = build('youtube', 'v3', developerKey=YOUTUBE_API_KEY)
-
-def get_video_transcript_with_timestamps(video_id: str) -> List[Dict]:
-    try:
-        transcript = YouTubeTranscriptApi.get_transcript(video_id)
-        return transcript
-    except Exception as e:
-        return f"An error occurred while fetching the transcript: {str(e)}"
 
 def get_video_info(video_id: str) -> Dict:
     try:
@@ -74,52 +74,120 @@ def get_all_comments(video_id: str) -> List[Dict]:
         return f"An error occurred while fetching comments: {str(e)}"
 
 def get_video_transcript_with_timestamps(video_id: str) -> List[Dict]:
+    methods = [
+        fetch_transcript_directly,
+        fetch_transcript_with_rotating_proxy,
+        fetch_transcript_with_selenium,
+        fetch_transcript_from_third_party,
+        fetch_transcript_with_custom_headers
+    ]
+    
+    random.shuffle(methods)  # Randomize the order of methods
+    
+    for method in methods:
+        try:
+            transcript = method(video_id)
+            if transcript:
+                return transcript
+        except Exception as e:
+            print(f"Method {method.__name__} failed: {str(e)}")
+        time.sleep(random.uniform(1, 3))  # Add random delay between attempts
+    
+    return f"An error occurred while fetching the transcript: All methods failed"
+
+def fetch_transcript_directly(video_id: str) -> List[Dict]:
+    from youtube_transcript_api import YouTubeTranscriptApi
+    return YouTubeTranscriptApi.get_transcript(video_id)
+
+def fetch_transcript_with_rotating_proxy(video_id: str) -> List[Dict]:
+    from youtube_transcript_api import YouTubeTranscriptApi
+    proxy_api_url = "https://api.proxyscrape.com/v2/?request=getproxies&protocol=http&timeout=10000&country=all&ssl=all&anonymity=all"
+    response = requests.get(proxy_api_url)
+    proxies = response.text.strip().split('\r\n')
+    
+    for proxy in proxies:
+        try:
+            proxy_dict = {
+                'http': f'http://{proxy}',
+                'https': f'http://{proxy}',
+            }
+            return YouTubeTranscriptApi.get_transcript(video_id, proxies=proxy_dict)
+        except Exception as e:
+            print(f"Proxy {proxy} failed: {str(e)}")
+    
+    raise Exception("All proxies failed")
+
+def fetch_transcript_with_selenium(video_id: str) -> List[Dict]:
+    options = webdriver.ChromeOptions()
+    options.add_argument('--headless')
+    driver = webdriver.Chrome(options=options)
+    
     try:
-        captions = youtube.captions().list(
-            part='snippet',
-            videoId=video_id
-        ).execute()
-
-        if 'items' not in captions or len(captions['items']) == 0:
-            return "No captions found for this video."
-
-        caption_id = captions['items'][0]['id']
-        subtitle = youtube.captions().download(
-            id=caption_id,
-            tfmt='srt'
-        ).execute()
-
-        # Decode the subtitle content
-        subtitle_text = subtitle.decode('utf-8')
-
-        # Parse the SRT format
-        subtitle_parts = re.split(r'\n\n', subtitle_text.strip())
+        driver.get(f"https://www.youtube.com/watch?v={video_id}")
+        
+        # Wait for and click the "Show Transcript" button
+        transcript_button = WebDriverWait(driver, 10).until(
+            EC.presence_of_element_located((By.CSS_SELECTOR, "button[aria-label='Show transcript']"))
+        )
+        transcript_button.click()
+        
+        # Wait for the transcript to load
+        WebDriverWait(driver, 10).until(
+            EC.presence_of_element_located((By.CSS_SELECTOR, "div[id='segments-container']"))
+        )
+        
+        # Extract transcript
+        transcript_elements = driver.find_elements(By.CSS_SELECTOR, "div[id='segments-container'] div.segment")
         transcript = []
-
-        for part in subtitle_parts:
-            lines = part.split('\n')
-            if len(lines) >= 3:
-                time_range = lines[1].split(' --> ')
-                start_time = time_to_seconds(time_range[0])
-                text = ' '.join(lines[2:])
-                transcript.append({
-                    'start': start_time,
-                    'text': unescape(text)
-                })
-
+        for element in transcript_elements:
+            time_element = element.find_element(By.CSS_SELECTOR, "div.segment-timestamp")
+            text_element = element.find_element(By.CSS_SELECTOR, "div.segment-text")
+            transcript.append({
+                "text": text_element.text,
+                "start": time_element.text,
+                "duration": 0  # We don't have duration information in this method
+            })
+        
         return transcript
+    finally:
+        driver.quit()
 
+def fetch_transcript_from_third_party(video_id: str) -> List[Dict]:
+    # This is a placeholder for a hypothetical third-party service
+    api_url = f"https://api.transcriptservice.com/v1/youtube/{video_id}"
+    response = requests.get(api_url)
+    if response.status_code == 200:
+        return response.json()
+    else:
+        raise Exception(f"Third-party API request failed with status code {response.status_code}")
+
+def fetch_transcript_with_custom_headers(video_id: str) -> List[Dict]:
+    from youtube_transcript_api import YouTubeTranscriptApi
+    headers = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+        'Accept-Language': 'en-US,en;q=0.9',
+        'Accept-Encoding': 'gzip, deflate, br',
+        'Connection': 'keep-alive',
+        'Upgrade-Insecure-Requests': '1',
+        'TE': 'Trailers',
+    }
+    
+    session = requests.Session()
+    session.headers.update(headers)
+    
+    try:
+        return YouTubeTranscriptApi.get_transcript(video_id, proxies=session.proxies, headers=session.headers)
     except Exception as e:
-        return f"An error occurred while fetching the transcript: {str(e)}"
-
-def time_to_seconds(time_str: str) -> float:
-    h, m, s = time_str.split(':')
-    return int(h) * 3600 + int(m) * 60 + float(s.replace(',', '.'))
+        raise Exception(f"Custom headers method failed: {str(e)}")
 
 def format_time(seconds: float) -> str:
     hours, remainder = divmod(int(seconds), 3600)
     minutes, seconds = divmod(remainder, 60)
     return f"{hours:02d}:{minutes:02d}:{seconds:02d}"
+
+# Function to make text between * symbols bold
+def format_bold(text):
+    return re.sub(r'\*(.*?)\*', r'<strong>\1</strong>', text)
 
 async def process_transcript_chunk(chunk: str, video_id: str) -> str:
     prompt = f"""This is a portion of a video transcript. Please organize this content into the following structure:
@@ -130,7 +198,7 @@ Starting timestamp:
 Ending Timestamp:
 Transcript:
 
-The goal is to not summarize or alter any information, but just reorganize the existing transcript into this structure. Use the provided timestamps to determine the start and end times for each section.
+The goal is to not summarize or alter any information, but just reorganize the existing transcript into this structure.GIVE 5 TO 8 lines for individual timestamp. Use the provided timestamps to determine the start and end times for each section.
 
 Here's the transcript chunk:
 {chunk}
@@ -170,7 +238,7 @@ async def generate_blog_post(processed_transcript: str, video_info: Dict) -> str
 
 1. Title
 2. Introduction
-3. Main content with subheadings (including timestamps)
+3. Main content with subheadings (including timestamps with 5 to 8 lines in a content)
 4. Key moments
 5. Conclusion
 6. Product links (if any mentioned in the video)
@@ -190,7 +258,7 @@ Please format the blog post accordingly, ensuring all relevant information from 
         response = await openai.ChatCompletion.acreate(
             model="gpt-4o-mini",
             messages=[
-                {"role": "system", "content": "You are a helpful assistant that creates detailed blog posts from video transcripts and information."},
+                {"role": "system", "content": "You are a helpful assistant that creates detailed blog posts from video transcripts and information.make the thumbnail image into center.make a quick responce.make a quick responce. if it take above 20 seconds give some extra warning message for please wait.and finally give the total time taken for the total responds."},
                 {"role": "user", "content": prompt}
             ],
             max_tokens=3500
@@ -231,7 +299,6 @@ def format_blog_post(blog_post: str, video_info: Dict) -> str:
     return formatted_post
 
 st.set_page_config(layout="wide")
-
 st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;700&display=swap');
@@ -319,41 +386,33 @@ st.markdown("""
         border-radius: 8px;
         box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
     }
-    .comments-container {
-        max-width: 800px;
-        margin: 2rem auto;
-        border: 1px solid #e0e0e0;
-        border-radius: 8px;
-        padding: 20px;
+   .comment-container {
+        max-height: 500px;
+        max-width: 500px;
+        overflow-y: scroll;
+        padding: 10px;
+        border: 1px solid #ccc;
         background-color: #f9f9f9;
     }
-    .comments-scrollable {
-        max-height: 500px;
-        overflow-y: auto;
-    }
     .comment {
-        background-color: #ffffff;
-        border-left: 4px solid #3498db;
-        padding: 15px;
         margin-bottom: 15px;
-        border-radius: 4px;
-        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        padding: 10px;
+        border-bottom: 1px solid #eee;
     }
     .comment-author {
         font-weight: bold;
-        color: #2c3e50;
+        margin-bottom: 5px;
     }
     .comment-date {
-        font-size: 0.8em;
-        color: #7f8c8d;
+        font-size: 0.9em;
+        color: #888;
     }
     .comment-text {
-        margin-top: 5px;
+        margin: 10px 0;
     }
     .comment-likes {
+        color: #007BFF;
         font-size: 0.9em;
-        color: #3498db;
-        margin-top: 5px;
     }
     a {
         color: #3498db;
@@ -369,43 +428,67 @@ st.title("BENT-S-BLOG")
 
 video_id = st.text_input("Enter YouTube Video ID")
 
-if st.button("Process Transcript and Generate Blog Post"):
+if st.button("Click To Generate"):
     if video_id:
-        with st.spinner("Processing transcript and generating blog post..."):
+        start_time = time.time()
+        with st.spinner("Hang tight! We're processing your transcript and crafting a tailored blog post. It may take a few minutes, but we promise it's worth the wait for quality content!..."):
             video_info = get_video_info(video_id)
             if isinstance(video_info, dict):
                 transcript = get_video_transcript_with_timestamps(video_id)
                 comments = get_all_comments(video_id)
+
                 if isinstance(transcript, list) and isinstance(comments, list):
                     processed_transcript = asyncio.run(process_full_transcript(transcript, video_id))
+                    
+                    # Add waiting message for longer responses
+                    waiting_message = st.empty()
+                    if time.time() - start_time > 20:
+                        waiting_message.markdown("<div class='waiting-message'>Please wait, we're still working on your request. This may take a few more moments.</div>", unsafe_allow_html=True)
+                    
                     blog_post = asyncio.run(generate_blog_post(processed_transcript, video_info))
                     formatted_blog_post = format_blog_post(blog_post, video_info)
                     
+                    # Clear waiting message
+                    waiting_message.empty()
+                    
+                    # Display the entire content in one container
+                    st.markdown("<div class='content-container'>", unsafe_allow_html=True)
+                    
                     # Display the blog post content
                     st.markdown("<div class='blog-post'>", unsafe_allow_html=True)
-                    st.markdown("<div class='blog-content'>", unsafe_allow_html=True)
                     st.markdown(formatted_blog_post, unsafe_allow_html=True)
                     st.markdown("</div>", unsafe_allow_html=True)
-                    st.markdown("</div>", unsafe_allow_html=True)
+
+                # Comments Section Heading
+                st.markdown("<h2>Comments</h2>", unsafe_allow_html=True)
+
+                # Container for comments
+                if isinstance(comments, list):
+                    st.markdown("<div class='comment-container'>", unsafe_allow_html=True)
                     
-                   # Display comments in a separate container with internal scrolling
-                    st.markdown("<div class='comments-container'>", unsafe_allow_html=True)
-                    st.markdown("<h2>Comments</h2>", unsafe_allow_html=True)
-                    st.markdown("<div class='comments-scrollable'>", unsafe_allow_html=True)
+                    # Loop to display comments
                     for comment in comments:
+                        formatted_text = format_bold(comment['text'])  # Format text to make *bold* text bold
                         st.markdown(f"""
-<div class="comment">
-    <div class="comment-author">{comment['author']}</div>
-    <div class="comment-date">{comment['published_at']}</div>
-    <div class="comment-text">{comment['text']}</div>
-    <div class="comment-likes">👍 {comment['likes']}</div>
-</div>
-""", unsafe_allow_html=True)
+                        <div class="comment">
+                            <div class="comment-author">{comment['author']}</div>
+                            <div class="comment-date">{comment['published_at']}</div>
+                            <div class="comment-text">{formatted_text}</div>
+                            <div class="comment-likes">:+1: {comment['likes']}</div>
+                        </div>
+                        """, unsafe_allow_html=True)
+                    
+                    # Close the comment container
                     st.markdown("</div>", unsafe_allow_html=True)
-                    st.markdown("</div>", unsafe_allow_html=True)
+
                 else:
-                    st.error(transcript if isinstance(transcript, str) else comments)
+                    st.error("Failed to retrieve comments.")
+                
+                # Display total time taken
+                end_time = time.time()
+                total_time = end_time - start_time
+                st.markdown(f"<div class='total-time'>Total time taken: {total_time:.2f} seconds</div>", unsafe_allow_html=True)
             else:
                 st.error(video_info)
     else:
-         st.error("Please enter a YouTube Video ID.")
+        st.error("Please enter a YouTube Video ID.")
