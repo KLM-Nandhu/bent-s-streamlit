@@ -315,7 +315,7 @@ st.markdown("""
         padding: 2rem;
     }
     .stButton>button {
-        width: 100%;
+        width: 45%;
         background-color: #4CAF50;
         color: white;
         border: none;
@@ -443,7 +443,7 @@ st.title("BENT-S-BLOG")
 
 video_id = st.text_input("Enter YouTube Video ID")
 
-if st.button("Process Transcript and Generate Blog Post"):
+if st.button("Click To Generate"):
     if video_id:
         with st.spinner("Processing transcript and generating blog post..."):
             video_info = get_video_info(video_id)
