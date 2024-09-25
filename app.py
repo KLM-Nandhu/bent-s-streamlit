@@ -436,7 +436,7 @@ video_id = st.text_input("Enter YouTube Video ID")
 if st.button("Click To Generate"):
     if video_id:
         start_time = time.time()
-        with st.spinner("Processing transcript and generating blog post..."):
+        with st.spinner("Hang tight! We're processing your transcript and crafting a tailored blog post. It may take a few minutes, but we promise it's worth the wait for quality content!..."):
             video_info = get_video_info(video_id)
             if isinstance(video_info, dict):
                 transcript = get_video_transcript_with_timestamps(video_id)
