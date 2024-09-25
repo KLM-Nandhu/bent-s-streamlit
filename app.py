@@ -388,7 +388,7 @@ st.markdown("""
     .comment-container {
         height: 500px;
         width: 500px;
-        overflow-y: scroll;
+        overflow-y: auto;
         padding: 10px;
         border: 1px solid #ccc;
         background-color: #f9f9f9;
@@ -464,23 +464,19 @@ if st.button("Click To Generate"):
 
                     # Container for comments
                     if isinstance(comments, list):
-                        st.markdown("<div class='comment-container'>", unsafe_allow_html=True)
-                        
-                        # Loop to display comments
+                        comment_html = "<div class='comment-container'>"
                         for comment in comments:
-                            # Make text between asterisks bold
                             formatted_text = re.sub(r'\*(.*?)\*', r'<strong>\1</strong>', comment['text'])
-                            st.markdown(f"""
+                            comment_html += f"""
                             <div class="comment">
                                 <div class="comment-author">{comment['author']}</div>
                                 <div class="comment-date">{comment['published_at']}</div>
                                 <div class="comment-text">{formatted_text}</div>
                                 <div class="comment-likes">👍 {comment['likes']}</div>
                             </div>
-                            """, unsafe_allow_html=True)
-                        
-                        # Close the comment container
-                        st.markdown("</div>", unsafe_allow_html=True)
+                            """
+                        comment_html += "</div>"
+                        st.markdown(comment_html, unsafe_allow_html=True)
                     else:
                         st.error("Failed to retrieve comments.")
                     
