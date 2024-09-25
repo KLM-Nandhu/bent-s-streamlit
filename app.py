@@ -69,8 +69,30 @@ def get_all_comments(video_id: str) -> List[Dict]:
 
 def get_video_transcript_with_timestamps(video_id: str) -> List[Dict]:
     try:
-        transcript = YouTubeTranscriptApi.get_transcript(video_id)
-        return transcript
+        # List of free proxy servers (you should rotate these and find reliable ones)
+        proxies = [
+            'http://203.30.189.42:80',
+            'http://203.30.191.42:80',
+            'http://203.30.190.42:80',
+            # Add more proxy servers here
+        ]
+        
+        for proxy in proxies:
+            try:
+                # Set up the proxy
+                proxy_dict = {
+                    'http': proxy,
+                    'https': proxy,
+                }
+                
+                # Create a custom YouTubeTranscriptApi with the proxy
+                transcript = YouTubeTranscriptApi.get_transcript(video_id, proxies=proxy_dict)
+                return transcript
+            except Exception as e:
+                print(f"Proxy {proxy} failed: {str(e)}")
+                continue
+        
+        raise Exception("All proxies failed")
     except Exception as e:
         return f"An error occurred while fetching the transcript: {str(e)}"
 
@@ -339,7 +361,7 @@ if st.button("Process Transcript and Generate Blog Post"):
                     blog_post = asyncio.run(generate_blog_post(processed_transcript, video_info))
                     formatted_blog_post = format_blog_post(blog_post, video_info)
                     
-                    # Display the blog post content
+                     # Display the blog post content
                     st.markdown("<div class='blog-post'>", unsafe_allow_html=True)
                     st.markdown("<div class='blog-content'>", unsafe_allow_html=True)
                     st.markdown(formatted_blog_post, unsafe_allow_html=True)
@@ -352,13 +374,13 @@ if st.button("Process Transcript and Generate Blog Post"):
                     st.markdown("<div class='comments-scrollable'>", unsafe_allow_html=True)
                     for comment in comments:
                         st.markdown(f"""
-<div class="comment">
-    <div class="comment-author">{comment['author']}</div>
-    <div class="comment-date">{comment['published_at']}</div>
-    <div class="comment-text">{comment['text']}</div>
-    <div class="comment-likes">👍 {comment['likes']}</div>
-</div>
-""", unsafe_allow_html=True)
+        <div class="comment">
+            <div class="comment-author">{comment['author']}</div>
+            <div class="comment-date">{comment['published_at']}</div>
+            <div class="comment-text">{comment['text']}</div>
+            <div class="comment-likes">👍 {comment['likes']}</div>
+        </div>
+        """, unsafe_allow_html=True)
                     st.markdown("</div>", unsafe_allow_html=True)
                     st.markdown("</div>", unsafe_allow_html=True)
                 else:
