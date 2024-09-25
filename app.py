@@ -312,7 +312,7 @@ st.markdown("""
         padding: 2rem;
     }
     .stButton>button {
-        width: 100%;
+        width: 10%;
         background-color: #3498db;
         color: white;
         border: none;
