@@ -290,7 +290,7 @@ Please format the response as follows:
         response = await openai.ChatCompletion.acreate(
             model="gpt-4o-mini",
             messages=[
-                {"role": "system", "content": "You are a helpful assistant that organizes video transcripts without altering their content."},
+                {"role": "system", "content": "You are a helpful assistant that organizes video transcripts without altering their content.The responce time is should not above 20seconds of every single request."},
                 {"role": "user", "content": prompt}
             ],
             max_tokens=2000
@@ -334,7 +334,7 @@ Please format the blog post accordingly, ensuring all relevant information from 
         response = await openai.ChatCompletion.acreate(
             model="gpt-4o-mini",
             messages=[
-                {"role": "system", "content": "You are a helpful assistant that creates detailed blog posts from video transcripts and information."},
+                {"role": "system", "content": "You are a helpful assistant that creates detailed blog posts from video transcripts and information.The responce time is should not above 20seconds of every single request."},
                 {"role": "user", "content": prompt}
             ],
             max_tokens=3500
