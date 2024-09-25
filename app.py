@@ -383,41 +383,32 @@ st.markdown("""
         border-radius: 8px;
         box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
     }
-    .comments-container {
-        max-width: 800px;
-        margin: 2rem auto;
-        border: 1px solid #e0e0e0;
-        border-radius: 8px;
-        padding: 20px;
+   .comment-container {
+        max-height: 500px;
+        overflow-y: scroll;
+        padding: 10px;
+        border: 1px solid #ccc;
         background-color: #f9f9f9;
     }
-    .comments-scrollable {
-        max-height: 500px;
-        overflow-y: auto;
-    }
     .comment {
-        background-color: #ffffff;
-        border-left: 4px solid #3498db;
-        padding: 15px;
         margin-bottom: 15px;
-        border-radius: 4px;
-        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        padding: 10px;
+        border-bottom: 1px solid #eee;
     }
     .comment-author {
         font-weight: bold;
-        color: #2c3e50;
+        margin-bottom: 5px;
     }
     .comment-date {
-        font-size: 0.8em;
-        color: #7f8c8d;
+        font-size: 0.9em;
+        color: #888;
     }
     .comment-text {
-        margin-top: 5px;
+        margin: 10px 0;
     }
     .comment-likes {
+        color: #007BFF;
         font-size: 0.9em;
-        color: #3498db;
-        margin-top: 5px;
     }
     a {
         color: #3498db;
@@ -462,39 +453,6 @@ if st.button("Click To Generate"):
                     st.markdown("<div class='blog-post'>", unsafe_allow_html=True)
                     st.markdown(formatted_blog_post, unsafe_allow_html=True)
                     st.markdown("</div>", unsafe_allow_html=True)
-                    
-                
-st.markdown("""
-    <style>
-    .comment-container {
-        max-height: 500px;
-        overflow-y: scroll;
-        padding: 10px;
-        border: 1px solid #ccc;
-        background-color: #f9f9f9;
-    }
-    .comment {
-        margin-bottom: 15px;
-        padding: 10px;
-        border-bottom: 1px solid #eee;
-    }
-    .comment-author {
-        font-weight: bold;
-        margin-bottom: 5px;
-    }
-    .comment-date {
-        font-size: 0.9em;
-        color: #888;
-    }
-    .comment-text {
-        margin: 10px 0;
-    }
-    .comment-likes {
-        color: #007BFF;
-        font-size: 0.9em;
-    }
-    </style>
-    """, unsafe_allow_html=True)
 
 # Container for comments
 st.markdown("<div class='comment-container'>", unsafe_allow_html=True)
