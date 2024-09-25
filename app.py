@@ -15,6 +15,7 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from bs4 import BeautifulSoup
+from youtube_transcript_api import YouTubeTranscriptApi
 
 # Set your API keys here
 openai.api_key = st.secrets["OPENAI_API_KEY"]
@@ -22,6 +23,88 @@ YOUTUBE_API_KEY = st.secrets["YOUTUBE_API_KEY"]
 
 youtube = build('youtube', 'v3', developerKey=YOUTUBE_API_KEY)
 
+# Improved CSS for better UI
+st.markdown("""
+<style>
+    @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;700&family=Playfair+Display:wght@700&display=swap');
+    
+    body {
+        font-family: 'Roboto', sans-serif;
+        background-color: #f0f2f5;
+        color: #333;
+        line-height: 1.6;
+    }
+    .stApp {
+        max-width: 1000px;
+        margin: 0 auto;
+    }
+    .main .block-container {
+        padding-top: 2rem;
+        padding-bottom: 2rem;
+    }
+    h1 {
+        font-family: 'Playfair Display', serif;
+        color: #2c3e50;
+        text-align: center;
+        margin-bottom: 2rem;
+    }
+    .stButton>button {
+        background-color: #3498db;
+        color: white;
+        font-weight: bold;
+        border-radius: 5px;
+        padding: 0.5rem 1rem;
+        width: 100%;
+    }
+    .stButton>button:hover {
+        background-color: #2980b9;
+    }
+    .blog-container {
+        background-color: white;
+        padding: 2rem;
+        border-radius: 10px;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        margin-top: 2rem;
+    }
+    .blog-title {
+        font-family: 'Playfair Display', serif;
+        font-size: 2.5em;
+        color: #2c3e50;
+        text-align: center;
+        margin-bottom: 1rem;
+    }
+    .blog-meta {
+        text-align: center;
+        color: #7f8c8d;
+        margin-bottom: 1rem;
+        font-size: 0.9em;
+    }
+    .blog-content img {
+        max-width: 100%;
+        height: auto;
+        margin: 1rem auto;
+        display: block;
+        border-radius: 5px;
+    }
+    .blog-content h2 {
+        font-family: 'Playfair Display', serif;
+        color: #2c3e50;
+        margin-top: 1.5rem;
+    }
+    .blog-content p {
+        margin-bottom: 1rem;
+    }
+    .comment {
+        background-color: #f9f9f9;
+        border-left: 4px solid #3498db;
+        padding: 1rem;
+        margin-bottom: 1rem;
+        border-radius: 5px;
+    }
+</style>
+""", unsafe_allow_html=True)
+
+@st.cache_data(ttl=3600)
 def get_video_info(video_id: str) -> Dict:
     try:
         response = youtube.videos().list(
@@ -43,6 +126,7 @@ def get_video_info(video_id: str) -> Dict:
     except Exception as e:
         return f"An error occurred while fetching video info: {str(e)}"
 
+@st.cache_data(ttl=3600)
 def get_all_comments(video_id: str) -> List[Dict]:
     try:
         comments = []
@@ -73,6 +157,7 @@ def get_all_comments(video_id: str) -> List[Dict]:
     except Exception as e:
         return f"An error occurred while fetching comments: {str(e)}"
 
+@st.cache_data(ttl=3600)
 def get_video_transcript_with_timestamps(video_id: str) -> List[Dict]:
     methods = [
         fetch_transcript_directly,
@@ -96,11 +181,9 @@ def get_video_transcript_with_timestamps(video_id: str) -> List[Dict]:
     return f"An error occurred while fetching the transcript: All methods failed"
 
 def fetch_transcript_directly(video_id: str) -> List[Dict]:
-    from youtube_transcript_api import YouTubeTranscriptApi
     return YouTubeTranscriptApi.get_transcript(video_id)
 
 def fetch_transcript_with_rotating_proxy(video_id: str) -> List[Dict]:
-    from youtube_transcript_api import YouTubeTranscriptApi
     proxy_api_url = "https://api.proxyscrape.com/v2/?request=getproxies&protocol=http&timeout=10000&country=all&ssl=all&anonymity=all"
     response = requests.get(proxy_api_url)
     proxies = response.text.strip().split('\r\n')
@@ -154,7 +237,6 @@ def fetch_transcript_with_selenium(video_id: str) -> List[Dict]:
 
 def fetch_transcript_from_third_party(video_id: str) -> List[Dict]:
     # This is a placeholder for a hypothetical third-party service
-    # You would need to replace this with an actual API call to a service that provides YouTube transcripts
     api_url = f"https://api.transcriptservice.com/v1/youtube/{video_id}"
     response = requests.get(api_url)
     if response.status_code == 200:
@@ -163,7 +245,6 @@ def fetch_transcript_from_third_party(video_id: str) -> List[Dict]:
         raise Exception(f"Third-party API request failed with status code {response.status_code}")
 
 def fetch_transcript_with_custom_headers(video_id: str) -> List[Dict]:
-    from youtube_transcript_api import YouTubeTranscriptApi
     headers = {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
         'Accept-Language': 'en-US,en;q=0.9',
@@ -216,17 +297,15 @@ Please format the response as follows:
         )
         return response.choices[0].message.content
     except Exception as e:
-        return f"An error occurred while processing with GPT-4: {str(e)}"
+        return f"An error occurred while processing with GPT-3.5: {str(e)}"
 
 async def process_full_transcript(transcript: List[Dict], video_id: str) -> str:
     chunk_size = 10000  # Adjust this value based on your needs
     full_transcript = " ".join([f"{format_time(entry['start'])}: {entry['text']}" for entry in transcript])
     chunks = [full_transcript[i:i+chunk_size] for i in range(0, len(full_transcript), chunk_size)]
     
-    processed_chunks = []
-    for chunk in chunks:
-        processed_chunk = await process_transcript_chunk(chunk, video_id)
-        processed_chunks.append(processed_chunk)
+    tasks = [process_transcript_chunk(chunk, video_id) for chunk in chunks]
+    processed_chunks = await asyncio.gather(*tasks)
     
     return "\n\n".join(processed_chunks)
 
@@ -272,7 +351,7 @@ def make_links_clickable(text: str) -> str:
 
 def format_blog_post(blog_post: str, video_info: Dict) -> str:
     lines = blog_post.split('\n')
-    formatted_post = f"<h1>{video_info['title']}</h1>"
+    formatted_post = f"<h1 class='blog-title'>{video_info['title']}</h1>"
     formatted_post += f"<div class='blog-meta'>Published on {video_info['published_at']} | {video_info['view_count']} views | {video_info['like_count']} likes</div>"
     formatted_post += get_image_html(video_info['thumbnail_url'], video_info['title'])
     
@@ -280,9 +359,9 @@ def format_blog_post(blog_post: str, video_info: Dict) -> str:
         if line.startswith('Title:'):
             continue  # Skip the title as we've already added it
         elif line.lower().startswith(('introduction', 'conclusion')):
-            formatted_post += f"<h2><strong>{line}</strong></h2>"
+            formatted_post += f"<h2>{line}</h2>"
         elif line.startswith(('###', '##')):
-            formatted_post += f"<h3><strong>{line.strip('#').strip()}</strong></h3>"
+            formatted_post += f"<h3>{line.strip('#').strip()}</h3>"
         elif re.match(r'\d{2}:\d{2}:\d{2}', line):  # Check for timestamp
             timestamp = sum(int(x) * 60 ** i for i, x in enumerate(reversed(line.split(':')[:3])))
             thumbnail_url = f"https://img.youtube.com/vi/{video_info['id']}/{int(timestamp/10)}.jpg"
@@ -295,207 +374,50 @@ def format_blog_post(blog_post: str, video_info: Dict) -> str:
     
     return formatted_post
 
-st.set_page_config(layout="wide")
+async def main():
+    st.title("BENT-S-BLOG")
 
-import streamlit as st
+    col1, col2, col3 = st.columns([1,2,1])
+    with col2:
+        video_id = st.text_input("Enter YouTube Video ID")
+        process_button = st.button("Generate Blog Post")
 
-# Define the CSS as a string
-import streamlit as st
-
-# Define the CSS as a string
-css = """
-<style>
-    @import url('https://fonts.googleapis.com/css2?family=Lora:wght@400;700&family=Open+Sans:wght@400;600&display=swap');
-    
-    .blog-container {
-        max-width: 800px;
-        margin: 0 auto;
-        padding: 20px;
-        background-color: #ffffff;
-        box-shadow: 0 0 20px rgba(0,0,0,0.1);
-        border-radius: 10px;
-    }
-    .blog-post {
-        font-family: 'Open Sans', sans-serif;
-        line-height: 1.8;
-        color: #333;
-    }
-    .blog-post h1 {
-        font-family: 'Lora', serif;
-        font-size: 2.5em;
-        color: #2c3e50;
-        text-align: center;
-        margin-bottom: 20px;
-    }
-    .blog-post h2 {
-        font-family: 'Lora', serif;
-        font-size: 1.8em;
-        color: #34495e;
-        border-bottom: 2px solid #3498db;
-        padding-bottom: 10px;
-        margin-top: 30px;
-    }
-    .blog-post h3 {
-        font-family: 'Lora', serif;
-        font-size: 1.5em;
-        color: #34495e;
-    }
-    .blog-meta {
-        font-size: 0.9em;
-        color: #7f8c8d;
-        text-align: center;
-        margin-bottom: 20px;
-    }
-    .blog-image {
-        max-width: 100%;
-        height: auto;
-        border-radius: 10px;
-        margin: 20px 0;
-        box-shadow: 0 0 10px rgba(0,0,0,0.1);
-    }
-    .product-box {
-        background-color: #e8f4fc;
-        border: 1px solid #3498db;
-        border-radius: 5px;
-        padding: 15px;
-        margin: 20px 0;
-    }
-    .product-name {
-        font-weight: 600;
-        color: #2c3e50;
-        font-size: 1.1em;
-    }
-    .product-url {
-        word-break: break-all;
-        margin-top: 5px;
-    }
-    .timestamp {
-        font-weight: 600;
-        color: #e74c3c;
-    }
-    .key-moment {
-        background-color: #fdf2e9;
-        border-left: 4px solid #e67e22;
-        padding: 15px;
-        margin: 20px 0;
-    }
-    .comment {
-        background-color: #f9f9f9;
-        border-left: 4px solid #3498db;
-        padding: 15px;
-        margin-bottom: 15px;
-        border-radius: 5px;
-    }
-    .comment-author {
-        font-weight: 600;
-        color: #2c3e50;
-    }
-    .comment-date {
-        font-size: 0.8em;
-        color: #7f8c8d;
-    }
-    .comment-likes {
-        font-size: 0.9em;
-        color: #3498db;
-        margin-top: 5px;
-    }
-    .blog-content p {
-        margin-bottom: 20px;
-    }
-    blockquote {
-        border-left: 5px solid #3498db;
-        padding-left: 20px;
-        margin: 20px 0;
-        font-style: italic;
-        color: #34495e;
-    }
-</style>
-"""
-
-# Apply the CSS
-st.markdown(css, unsafe_allow_html=True)
-
-# Your existing Streamlit app code goes here
-st.title("BENT-S-BLOG")
-
-video_id = st.text_input("Enter YouTube Video ID")
-
-if st.button("Process Transcript and Generate Blog Post"):
-    if video_id:
-        with st.spinner("Processing transcript and generating blog post..."):
-            video_info = get_video_info(video_id)
-            if isinstance(video_info, dict):
-                transcript = get_video_transcript_with_timestamps(video_id)
-                comments = get_all_comments(video_id)
-                if isinstance(transcript, list) and isinstance(comments, list):
-                    processed_transcript = asyncio.run(process_full_transcript(transcript, video_id))
-                    blog_post = asyncio.run(generate_blog_post(processed_transcript, video_info))
-                    formatted_blog_post = format_blog_post(blog_post, video_info)
-                    
-                    # Display the blog post content
-                    st.markdown(formatted_blog_post, unsafe_allow_html=True)
-                    
-                    # Display comments
-                    st.markdown("<h2>Comments</h2>", unsafe_allow_html=True)
-                    for comment in comments:
-                        st.markdown(f"""
-                        <div class="comment">
-                            <div class="comment-author">{comment['author']}</div>
-                            <div class="comment-date">{comment['published_at']}</div>
-                            <div class="comment-text">{comment['text']}</div>
-                            <div class="comment-likes">👍 {comment['likes']}</div>
-                        </div>
-                        """, unsafe_allow_html=True)
-                else:
-                    st.error(transcript if isinstance(transcript, str) else comments)
-            else:
-                st.error(video_info)
-    else:
-        st.error("Please enter a YouTube Video ID.")
-
-# Updated format_blog_post function
-def format_blog_post(blog_post: str, video_info: Dict) -> str:
-    formatted_post = f"""
-    <div class="blog-container">
-        <div class="blog-post">
-            <h1>{video_info['title']}</h1>
-            <div class="blog-meta">Published on {video_info['published_at']} | {video_info['view_count']} views | {video_info['like_count']} likes</div>
-            <img src="{video_info['thumbnail_url']}" alt="{video_info['title']}" class="blog-image"/>
+    if process_button and video_id:
+        with st.spinner("Processing video and generating blog post..."):
+            start_time = time.time()
             
-            <div class="blog-content">
-                {blog_post}
-            </div>
-        </div>
-    </div>
-    """
-    return formatted_post
+            # Concurrent fetching of video info, transcript, and comments
+            video_info_task = asyncio.create_task(asyncio.to_thread(get_video_info, video_id))
+            transcript_task = asyncio.create_task(asyncio.to_thread(get_video_transcript_with_timestamps, video_id))
+            comments_task = asyncio.create_task(asyncio.to_thread(get_all_comments, video_id))
+            
+            video_info, transcript, comments = await asyncio.gather(video_info_task, transcript_task, comments_task)
+            
+            if isinstance(video_info, dict) and isinstance(transcript, list) and isinstance(comments, list):
+                processed_transcript = await process_full_transcript(transcript, video_id)
+                blog_post = await generate_blog_post(processed_transcript, video_info)
+                formatted_blog_post = format_blog_post(blog_post, video_info)
+                
+                st.markdown("<div class='blog-container'>", unsafe_allow_html=True)
+                st.markdown(formatted_blog_post, unsafe_allow_html=True)
+                st.markdown("</div>", unsafe_allow_html=True)
+                
+                st.subheader("Comments")
+                for comment in comments[:10]:  # Limit to 10 comments for performance
+                    st.markdown(f"""
+                    <div class="comment">
+                        <strong>{comment['author']}</strong> - {comment['published_at']}
+                        <p>{comment['text']}</p>
+                        <small>👍 {comment['likes']}</small>
+                    </div>
+                    """, unsafe_allow_html=True)
+                
+                end_time = time.time()
+                st.success(f"Blog post generated in {end_time - start_time:.2f} seconds")
+            else:
+                st.error("Failed to fetch video information, transcript, or comments.")
+    else:
+        st.info("Enter a YouTube Video ID and click 'Generate Blog Post' to start.")
 
-# You'll need to implement the logic in generate_blog_post to structure the content
-# Here's an example of how you might structure the blog post content:
-def generate_blog_post(processed_transcript: str, video_info: Dict) -> str:
-    # This is a placeholder. You'll need to implement the actual logic to generate the blog post
-    blog_post = f"""
-        <h2>Introduction</h2>
-        <p>Welcome to this exciting blog post about {video_info['title']}. In this article, we'll dive deep into the content of this video and explore its key points.</p>
-
-        <blockquote>"{video_info['description'][:100]}..."</blockquote>
-
-        <h2>Main Content</h2>
-        <p>This is where you would put the main content of your blog post, based on the processed transcript.</p>
-
-        <h2>Key Moments</h2>
-        <div class="key-moment">
-            <span class="timestamp">00:05:23</span>
-            <p>This is a key moment in the video. You would replace this with actual key moments from the transcript.</p>
-        </div>
-
-        <h2>Products Mentioned</h2>
-        <div class="product-box">
-            <div class="product-name">Example Product</div>
-            <div class="product-url"><a href="#" target="_blank">https://example.com/product</a></div>
-        </div>
-
-        <h2>Conclusion</h2>
-        <p>To wrap up, we've explored the main points of {video_info['title']}. We hope you found this blog post informative and engaging.</p>
-    """
-    return blog_post
+if __name__ == "__main__":
+    asyncio.run(main())
